@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-city Trip Builder — Flight Finder</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0a0e27; color: #e0e0e0; min-height: 100vh; }
+        .header { background: linear-gradient(135deg, #1a1f4e 0%, #0d3b66 100%); padding: 24px 32px; border-bottom: 2px solid #2563eb; display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { font-size: 28px; color: #60a5fa; }
+        .header p { color: #94a3b8; font-size: 14px; margin-top: 4px; }
+        .header nav a { color: #60a5fa; text-decoration: none; padding: 8px 16px; border: 1px solid #334155; border-radius: 8px; font-size: 13px; }
+        .header nav a:hover { background: #1e293b; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 24px; }
+        .search-form { background: #111535; border: 1px solid #1e293b; border-radius: 12px; padding: 24px; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px; }
+        .form-group { display: flex; flex-direction: column; gap: 6px; }
+        .form-group label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; font-weight: 600; }
+        .form-group input, .form-group select { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 10px 12px; color: #e2e8f0; font-size: 14px; outline: none; }
+        .form-group input:focus, .form-group select:focus { border-color: #2563eb; }
+        .btn-search { grid-column: 1 / -1; background: linear-gradient(135deg, #7c3aed, #6d28d9); color: white; border: none; border-radius: 10px; padding: 14px 32px; font-size: 16px; font-weight: 600; cursor: pointer; }
+        .btn-search:hover { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
+        .btn-search:disabled { opacity: 0.6; cursor: wait; }
+
+        /* Explainer */
+        .explainer { background: #111535; border: 1px solid #1e293b; border-radius: 12px; padding: 20px; margin-bottom: 24px; }
+        .explainer h3 { color: #a78bfa; margin-bottom: 8px; }
+        .explainer p { font-size: 13px; color: #94a3b8; line-height: 1.6; }
+        .explainer .route-example { background: #1e293b; border-radius: 8px; padding: 12px; margin-top: 10px; font-size: 13px; }
+        .explainer .route-example span { color: #a78bfa; font-weight: 600; }
+
+        /* Stats */
+        .stats-bar { display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+        .stat { background: #111535; border: 1px solid #1e293b; border-radius: 10px; padding: 16px 20px; min-width: 160px; }
+        .stat h4 { color: #64748b; font-size: 11px; text-transform: uppercase; margin-bottom: 4px; }
+        .stat .val { font-size: 22px; font-weight: 700; color: #a78bfa; }
+        .stat .detail { font-size: 11px; color: #64748b; margin-top: 2px; }
+
+        /* Trip cards */
+        .trip-card { background: #111535; border: 1px solid #1e293b; border-radius: 12px; margin-bottom: 16px; overflow: hidden; transition: border-color 0.2s; }
+        .trip-card:hover { border-color: #7c3aed; }
+        .trip-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; background: #0f1330; }
+        .trip-rank { font-size: 20px; font-weight: 700; color: #64748b; margin-right: 16px; }
+        .trip-type { font-size: 14px; font-weight: 600; color: #a78bfa; }
+        .trip-price { text-align: right; }
+        .trip-price .total { font-size: 22px; font-weight: 700; }
+        .trip-price .pp { font-size: 12px; color: #94a3b8; }
+        .price-green { color: #22c55e; }
+        .price-yellow { color: #eab308; }
+        .price-red { color: #ef4444; }
+
+        /* Segments */
+        .segments { padding: 16px 20px; }
+        .segment { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid #1e293b; }
+        .segment:last-child { border-bottom: none; }
+        .seg-icon { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+        .seg-flight { background: #1e3a5f; color: #60a5fa; }
+        .seg-layover { background: #451a03; color: #fb923c; }
+        .seg-stay { background: #064e3b; color: #34d399; }
+        .seg-details { flex: 1; }
+        .seg-route { font-weight: 600; font-size: 14px; }
+        .seg-date { font-size: 12px; color: #94a3b8; }
+        .seg-price { font-weight: 600; color: #e2e8f0; font-size: 14px; }
+
+        .trip-footer { padding: 10px 20px; background: #0f1330; display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #64748b; }
+        .stay-badge { background: #064e3b; color: #34d399; padding: 3px 10px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+        .flights-badge { background: #1e293b; color: #94a3b8; padding: 3px 10px; border-radius: 10px; font-size: 11px; }
+
+        /* Loading */
+        .loading { text-align: center; padding: 60px; color: #64748b; }
+        .spinner { width: 40px; height: 40px; border: 3px solid #1e293b; border-top-color: #7c3aed; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .error-bar { background: #451a03; border: 1px solid #9a3412; border-radius: 8px; padding: 10px 16px; margin-bottom: 16px; font-size: 13px; color: #fdba74; }
+        .no-results { text-align: center; padding: 40px; color: #64748b; }
+
+        /* Destination groups */
+        #destGroups { display: flex; flex-direction: column; gap: 4px; max-height: 600px; overflow-y: auto; padding-right: 8px; }
+        .dest-group { border: 1px solid #1e293b; border-radius: 8px; overflow: hidden; }
+        .dest-group.has-selected { border-color: #7c3aed; background: #0f0d25; }
+        .dest-group-header {
+            background: #1e293b; padding: 10px 14px; font-size: 14px; font-weight: 600;
+            color: #a78bfa; cursor: pointer; user-select: none;
+        }
+        .dest-group-header:hover { background: #2d3a52; }
+        .dest-group-airports { display: none; flex-wrap: wrap; gap: 6px; padding: 10px 12px; background: #0a0e27; }
+        .dest-group.open .dest-group-airports { display: flex; }
+        .dest-group.has-selected .dest-group-airports { display: flex; }
+        .dest-group-header::after { content: ' ▼'; font-size: 10px; }
+        .dest-group.open .dest-group-header::after { content: ' ▲'; }
+        .dest-group.has-selected .dest-group-header::after { content: ' ✓ ▼'; color: #22c55e; }
+        .dest-group.hidden { display: none; }
+        .dest-chip {
+            display: inline-flex; align-items: center; gap: 5px;
+            background: #1e293b; border: 1px solid #334155; border-radius: 20px;
+            padding: 6px 14px; cursor: pointer; font-size: 13px; transition: all 0.15s; color: #94a3b8;
+        }
+        .dest-chip:hover { border-color: #7c3aed; color: #e2e8f0; }
+        .dest-chip.selected { background: #2e1065; border-color: #a78bfa; color: #e9d5ff; }
+        .dest-chip strong { color: #c4b5fd; }
+        .dest-chip input { display: none; }
+        .dest-chip.hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <h1>Multi-city Trip Builder</h1>
+            <p>Automatycznie składa najtańsze podróże przez tanie huby (Ryanair)</p>
+        </div>
+        <nav style="display:flex;gap:8px"><a href="/">Wyszukiwarka prosta</a><a href="/smart">Smart Trip Planner</a></nav>
+    </div>
+    <div class="container">
+        <div class="explainer">
+            <h3>Jak to działa?</h3>
+            <p>Algorytm przeszukuje setki połączeń Ryanair przez tanie huby europejskie i składa najtańsze kombinacje lotów.
+            Zamiast lecieć drogo bezpośrednio, możesz lecieć przez tanie miasto z przesiadką — nawet z 1-2 dniowym postojem.</p>
+            <div class="route-example">
+                Przykład: <span>WAW → STN</span> (Ryanair 89 PLN) + <span>STN → FUE</span> (Ryanair 149 PLN) + <span>FUE → BGY</span> (Ryanair 99 PLN) + <span>BGY → WAW</span> (Ryanair 79 PLN) = <span>416 PLN/os zamiast 1000+ PLN</span>
+            </div>
+        </div>
+
+        <form class="search-form" id="searchForm" onsubmit="doSearch(event)">
+            <div class="form-group">
+                <label>Lotnisko wylotu</label>
+                <select id="origin">
+                    {% for code, name in airports.items() %}
+                    <option value="{{ code }}" {% if code == 'WAW' %}selected{% endif %}>{{ code }} — {{ name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Szukaj / wpisz kod IATA</label>
+                <input type="text" id="destSearch" placeholder="np. Fuerteventura, Grecja, FUE..." oninput="filterDests(this.value)" autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label>Dorośli</label>
+                <input type="number" id="adults" value="2" min="1" max="9">
+            </div>
+            <div class="form-group">
+                <label>Dzieci (2-11)</label>
+                <input type="number" id="children" value="2" min="0" max="9">
+            </div>
+            <div class="form-group">
+                <label>Wylot od</label>
+                <input type="date" id="date_out_from" value="2027-01-29">
+            </div>
+            <div class="form-group">
+                <label>Wylot do</label>
+                <input type="date" id="date_out_to" value="2027-02-03">
+            </div>
+            <div class="form-group">
+                <label>Powrót od</label>
+                <input type="date" id="date_ret_from" value="2027-02-10">
+            </div>
+            <div class="form-group">
+                <label>Powrót do</label>
+                <input type="date" id="date_ret_to" value="2027-02-14">
+            </div>
+            <div class="form-group">
+                <label>Max layover (dni)</label>
+                <select id="max_layover_days">
+                    <option value="0">Tego samego dnia</option>
+                    <option value="1" selected>Max 1 dzień</option>
+                    <option value="2">Max 2 dni</option>
+                    <option value="3">Max 3 dni</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Max budżet łączny (PLN)</label>
+                <input type="number" id="max_budget" placeholder="np. 4000" value="6000">
+            </div>
+            <div class="form-group" style="grid-column: 1 / -1;">
+                <label>Lotniska docelowe <span style="color:#64748b;font-weight:400">(kliknij region żeby zaznaczyć wszystkie, lub zaznacz pojedyncze lotniska)</span></label>
+                <div id="destGroups">
+                    {% for group in dest_groups %}
+                    <div class="dest-group" data-group="{{ group.name }}">
+                        <div class="dest-group-header" onclick="toggleGroup('{{ group.name }}')">{{ group.name }}</div>
+                        <div class="dest-group-airports">
+                            {% for ap in group.airports %}
+                            <label class="airport-chip dest-chip" data-group="{{ group.name }}" data-code="{{ ap.code }}" data-name="{{ ap.name }}">
+                                <input type="checkbox" name="destinations" value="{{ ap.code }}" {% if ap.code == 'FUE' %}checked{% endif %}>
+                                <strong>{{ ap.code }}</strong> {{ ap.name }}
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            <button type="submit" class="btn-search" id="btnSearch">Szukaj najtańszych kombinacji</button>
+        </form>
+
+        <div id="results"></div>
+    </div>
+
+    <script>
+        // Chip toggle
+        document.querySelectorAll('.dest-chip').forEach(chip => {
+            chip.addEventListener('click', function(e) {
+                if (e.target.tagName === 'INPUT') return;
+                const cb = this.querySelector('input');
+                cb.checked = !cb.checked;
+                this.classList.toggle('selected', cb.checked);
+                updateGroupHighlight(this.dataset.group);
+            });
+            // Init selected state
+            const cb = chip.querySelector('input');
+            if (cb.checked) chip.classList.add('selected');
+        });
+
+        function updateGroupHighlight(groupName) {
+            const group = document.querySelector(`.dest-group[data-group="${groupName}"]`);
+            const anyChecked = group.querySelector('input:checked');
+            group.classList.toggle('has-selected', !!anyChecked);
+        }
+        // Init
+        document.querySelectorAll('.dest-group').forEach(g => updateGroupHighlight(g.dataset.group));
+
+        function toggleGroup(groupName) {
+            const group = document.querySelector(`.dest-group[data-group="${groupName}"]`);
+            const chips = document.querySelectorAll(`.dest-chip[data-group="${groupName}"]`);
+            // If group is closed, open it first
+            if (!group.classList.contains('open')) {
+                // Close other open groups
+                document.querySelectorAll('.dest-group.open').forEach(g => {
+                    if (g.dataset.group !== groupName && !g.classList.contains('has-selected')) g.classList.remove('open');
+                });
+                group.classList.add('open');
+                return; // First click just opens
+            }
+            // Second click on open group: toggle all
+            const anyUnchecked = Array.from(chips).some(c => !c.querySelector('input').checked);
+            chips.forEach(chip => {
+                const cb = chip.querySelector('input');
+                cb.checked = anyUnchecked;
+                chip.classList.toggle('selected', cb.checked);
+            });
+            updateGroupHighlight(groupName);
+        }
+
+        function filterDests(query) {
+            const q = query.toLowerCase().trim();
+            document.querySelectorAll('.dest-group').forEach(group => {
+                const groupName = group.dataset.group.toLowerCase();
+                const chips = group.querySelectorAll('.dest-chip');
+                let anyVisible = false;
+                chips.forEach(chip => {
+                    const code = chip.dataset.code.toLowerCase();
+                    const name = chip.dataset.name.toLowerCase();
+                    const match = !q || code.includes(q) || name.includes(q) || groupName.includes(q);
+                    chip.classList.toggle('hidden', !match);
+                    if (match) anyVisible = true;
+                });
+                group.classList.toggle('hidden', !anyVisible);
+            });
+            // If query looks like IATA code (3 uppercase letters), auto-check it
+            if (/^[A-Z]{3}$/.test(query)) {
+                const chip = document.querySelector(`.dest-chip[data-code="${query}"]`);
+                if (chip) {
+                    const cb = chip.querySelector('input');
+                    if (!cb.checked) { cb.checked = true; chip.classList.add('selected'); updateGroupHighlight(chip.dataset.group); }
+                }
+            }
+        }
+
+        function getSelectedDests() {
+            return Array.from(document.querySelectorAll('input[name="destinations"]:checked')).map(cb => cb.value);
+        }
+
+        async function doSearch(e) {
+            e.preventDefault();
+            const dests = getSelectedDests();
+            if (!dests.length) { alert('Zaznacz przynajmniej jedno lotnisko docelowe!'); return; }
+            const btn = document.getElementById('btnSearch');
+            const div = document.getElementById('results');
+            btn.disabled = true;
+            btn.textContent = `Szukam tras do ${dests.length} lotnisk...`;
+            div.innerHTML = `<div class="loading"><div class="spinner"></div>
+                <p>Sprawdzam trasy Ryanair z ${document.getElementById('origin').value} do ${dests.join(', ')}...</p>
+                <p style="font-size:12px;color:#475569;margin-top:8px">Przeszukuję do 30 hubów na lotnisko. To może potrwać ${dests.length * 15}-${dests.length * 30} sekund.</p></div>`;
+
+            let allTrips = [];
+            let totalStats = { total_combinations: 0, hubs_checked: 0 };
+
+            // Search each destination
+            for (const dest of dests) {
+                try {
+                    const resp = await fetch('/search-multi', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            origin: document.getElementById('origin').value,
+                            destination: dest,
+                            adults: document.getElementById('adults').value,
+                            children: document.getElementById('children').value,
+                            date_out_from: document.getElementById('date_out_from').value,
+                            date_out_to: document.getElementById('date_out_to').value,
+                            date_ret_from: document.getElementById('date_ret_from').value,
+                            date_ret_to: document.getElementById('date_ret_to').value,
+                            max_layover_days: document.getElementById('max_layover_days').value,
+                            max_budget: document.getElementById('max_budget').value,
+                        }),
+                    });
+                    const data = await resp.json();
+                    // Tag trips with destination
+                    data.trips.forEach(t => t.final_dest = dest);
+                    allTrips.push(...data.trips);
+                    totalStats.total_combinations += data.stats.total_combinations;
+                    totalStats.hubs_checked = Math.max(totalStats.hubs_checked, data.stats.hubs_checked);
+                } catch (err) {
+                    console.error(`Error searching ${dest}:`, err);
+                }
+                // Update progress
+                const progress = dests.indexOf(dest) + 1;
+                div.querySelector('p').textContent = `Sprawdzam ${dest} (${progress}/${dests.length})...`;
+            }
+
+            // Sort all trips by total price
+            allTrips.sort((a, b) => a.total - b.total);
+            allTrips = allTrips.slice(0, 100);
+
+            const fakeData = {
+                trips: allTrips,
+                stats: { ...totalStats, total_combinations: allTrips.length, origin_routes: 0, dest_routes: 0, hubs_checked: totalStats.hubs_checked },
+                params: {
+                    origin: document.getElementById('origin').value,
+                    destination: dests.join(', '),
+                    adults: document.getElementById('adults').value,
+                    children: document.getElementById('children').value,
+                },
+            };
+            renderResults(fakeData);
+            btn.disabled = false;
+            btn.textContent = 'Szukaj najtańszych kombinacji';
+        }
+
+        function priceColor(total) {
+            if (total <= 3000) return 'price-green';
+            if (total <= 5000) return 'price-yellow';
+            return 'price-red';
+        }
+
+        function renderResults(data) {
+            const { trips, stats, params } = data;
+            const pax = parseInt(params.adults) + parseInt(params.children);
+            let html = '';
+
+            // Stats
+            html += '<div class="stats-bar">';
+            html += `<div class="stat"><h4>Kombinacji znalezionych</h4><div class="val">${trips.length}</div></div>`;
+            html += `<div class="stat"><h4>Hubów sprawdzonych</h4><div class="val">${stats.hubs_checked}</div></div>`;
+            html += `<div class="stat"><h4>Tras z ${params.origin}</h4><div class="val">${stats.origin_routes}</div></div>`;
+            html += `<div class="stat"><h4>Tras z ${params.destination}</h4><div class="val">${stats.dest_routes}</div></div>`;
+            if (trips.length > 0) {
+                html += `<div class="stat"><h4>Najtańsza (${pax} os.)</h4><div class="val ${priceColor(trips[0].total)}">${trips[0].total} PLN</div><div class="detail">${trips[0].type}</div></div>`;
+            }
+            html += '</div>';
+
+            if (trips.length === 0) {
+                html += '<div class="no-results"><p>Brak kombinacji w podanym budżecie / datach.</p><p style="margin-top:8px;font-size:13px">Spróbuj zwiększyć budżet, rozszerzyć daty lub zwiększyć max layover.</p></div>';
+                document.getElementById('results').innerHTML = html;
+                return;
+            }
+
+            // Trip cards
+            trips.forEach((trip, i) => {
+                html += `<div class="trip-card">`;
+                html += `<div class="trip-header">
+                    <div style="display:flex;align-items:center;gap:12px">
+                        <span class="trip-rank">#${i+1}</span>
+                        <span class="trip-type">${trip.type}</span>
+                    </div>
+                    <div class="trip-price">
+                        <div class="total ${priceColor(trip.total)}">${trip.total} PLN</div>
+                        <div class="pp">${trip.total_pp} PLN/os × ${pax} os.</div>
+                    </div>
+                </div>`;
+
+                // Segments
+                html += '<div class="segments">';
+                trip.segments.forEach((seg, si) => {
+                    html += `<div class="segment">
+                        <div class="seg-icon seg-flight">&#9992;</div>
+                        <div class="seg-details">
+                            <div class="seg-route">${seg.from} → ${seg.to}</div>
+                            <div class="seg-date">${seg.date} · Ryanair</div>
+                        </div>
+                        <div class="seg-price">${seg.price_pp} PLN/os</div>
+                    </div>`;
+
+                    // Show layover if next segment exists and is from same airport
+                    if (si < trip.segments.length - 1) {
+                        const next = trip.segments[si + 1];
+                        if (seg.to === next.from && seg.to !== params.destination) {
+                            const days = Math.round((new Date(next.date) - new Date(seg.date)) / 86400000);
+                            if (days > 0) {
+                                html += `<div class="segment">
+                                    <div class="seg-icon seg-layover">&#9201;</div>
+                                    <div class="seg-details">
+                                        <div class="seg-route">Layover w ${seg.to}</div>
+                                        <div class="seg-date">${days} ${days === 1 ? 'dzień' : 'dni'}</div>
+                                    </div>
+                                    <div class="seg-price" style="color:#64748b">—</div>
+                                </div>`;
+                            }
+                        } else if (seg.to === params.destination && next.from === params.destination) {
+                            const days = Math.round((new Date(next.date) - new Date(seg.date)) / 86400000);
+                            html += `<div class="segment">
+                                <div class="seg-icon seg-stay">&#127965;</div>
+                                <div class="seg-details">
+                                    <div class="seg-route">Pobyt na ${params.destination}</div>
+                                    <div class="seg-date">${days} ${days === 1 ? 'noc' : days < 5 ? 'noce' : 'nocy'}</div>
+                                </div>
+                                <div class="seg-price" style="color:#34d399">&#10003;</div>
+                            </div>`;
+                        }
+                    }
+                });
+                html += '</div>';
+
+                html += `<div class="trip-footer">
+                    <div>
+                        <span class="stay-badge">${trip.stay_days} nocy na miejscu</span>
+                        <span class="flights-badge">${trip.num_flights} loty</span>
+                        ${trip.hubs.length ? '<span class="flights-badge">Hub: ' + trip.hubs.join(', ') + '</span>' : ''}
+                    </div>
+                    <div>Oszczędność vs bezpośredni: kalkuluj na portalu</div>
+                </div>`;
+                html += '</div>';
+            });
+
+            document.getElementById('results').innerHTML = html;
+        }
+    </script>
+</body>
+</html>

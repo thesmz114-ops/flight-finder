@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flight Finder — Najtańsze Loty</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0a0e27;
+            color: #e0e0e0;
+            min-height: 100vh;
+        }
+        .header {
+            background: linear-gradient(135deg, #1a1f4e 0%, #0d3b66 100%);
+            padding: 24px 32px;
+            border-bottom: 2px solid #2563eb;
+        }
+        .header h1 {
+            font-size: 28px;
+            color: #60a5fa;
+        }
+        .header p { color: #94a3b8; font-size: 14px; margin-top: 4px; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 24px; }
+
+        /* Search Form */
+        .search-form {
+            background: #111535;
+            border: 1px solid #1e293b;
+            border-radius: 12px;
+            padding: 24px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .form-group { display: flex; flex-direction: column; gap: 6px; }
+        .form-group label {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #64748b;
+            font-weight: 600;
+        }
+        .form-group input, .form-group select {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 10px 12px;
+            color: #e2e8f0;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .form-group input:focus, .form-group select:focus {
+            border-color: #2563eb;
+        }
+
+        /* Airport checkboxes */
+        .airports-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            grid-column: 1 / -1;
+        }
+        .airport-chip {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 20px;
+            padding: 6px 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 13px;
+        }
+        .airport-chip:hover { border-color: #2563eb; }
+        .airport-chip.selected {
+            background: #1e3a5f;
+            border-color: #2563eb;
+            color: #60a5fa;
+        }
+        .airport-chip input { display: none; }
+
+        /* Buttons */
+        .btn-search {
+            grid-column: 1 / -1;
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            padding: 14px 32px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-search:hover { background: linear-gradient(135deg, #3b82f6, #2563eb); transform: translateY(-1px); }
+        .btn-search:disabled { opacity: 0.6; cursor: wait; }
+
+        /* Results */
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        .results-header h2 { font-size: 20px; color: #60a5fa; }
+        .stats { font-size: 13px; color: #64748b; }
+
+        /* Results table */
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        .results-table th {
+            background: #1e293b;
+            padding: 10px 12px;
+            text-align: left;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #64748b;
+            border-bottom: 2px solid #334155;
+            position: sticky;
+            top: 0;
+        }
+        .results-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #1e293b;
+            vertical-align: middle;
+        }
+        .results-table tr:hover { background: #111935; }
+        .price-total {
+            font-weight: 700;
+            font-size: 15px;
+        }
+        .price-good { color: #22c55e; }
+        .price-ok { color: #eab308; }
+        .price-bad { color: #ef4444; }
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .badge-direct { background: #064e3b; color: #34d399; }
+        .badge-stops { background: #451a03; color: #fb923c; }
+        .badge-source {
+            background: #1e293b;
+            color: #94a3b8;
+        }
+        .badge-error-fare { background: #7c2d12; color: #fb923c; }
+        .badge-charter { background: #312e81; color: #a5b4fc; }
+        a.book-link {
+            color: #60a5fa;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        a.book-link:hover { text-decoration: underline; }
+
+        /* External links section */
+        .ext-links {
+            background: #111535;
+            border: 1px solid #1e293b;
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 24px;
+        }
+        .ext-links h3 { color: #60a5fa; margin-bottom: 12px; font-size: 16px; }
+        .ext-links-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 8px;
+        }
+        .ext-link-card {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #1e293b;
+            border-radius: 8px;
+            padding: 10px 14px;
+            text-decoration: none;
+            color: #e2e8f0;
+            font-size: 13px;
+            transition: all 0.15s;
+        }
+        .ext-link-card:hover { background: #2d3a52; transform: translateX(2px); }
+        .ext-link-card .source-name { color: #60a5fa; font-weight: 600; min-width: 100px; }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 60px;
+            color: #64748b;
+        }
+        .spinner {
+            width: 40px; height: 40px;
+            border: 3px solid #1e293b;
+            border-top-color: #2563eb;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 16px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Errors */
+        .error-bar {
+            background: #451a03;
+            border: 1px solid #9a3412;
+            border-radius: 8px;
+            padding: 10px 16px;
+            margin-bottom: 16px;
+            font-size: 13px;
+            color: #fdba74;
+        }
+
+        /* Summary cards */
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .summary-card {
+            background: #111535;
+            border: 1px solid #1e293b;
+            border-radius: 12px;
+            padding: 20px;
+        }
+        .summary-card h4 { color: #64748b; font-size: 12px; text-transform: uppercase; margin-bottom: 8px; }
+        .summary-card .value { font-size: 24px; font-weight: 700; color: #22c55e; }
+        .summary-card .detail { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+
+        /* Action buttons row */
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+        .btn-action {
+            padding: 8px 16px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+            background: #1e293b;
+            color: #e2e8f0;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.15s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn-action:hover { background: #2d3a52; border-color: #2563eb; }
+        .btn-action.primary { background: #1d4ed8; border-color: #2563eb; }
+        .btn-action.primary:hover { background: #2563eb; }
+
+        /* Sortable headers */
+        .results-table th { cursor: pointer; user-select: none; }
+        .results-table th:hover { color: #60a5fa; }
+        .sort-arrow { font-size: 10px; margin-left: 4px; opacity: 0.5; }
+
+        /* Roundtrip badge */
+        .badge-roundtrip { background: #14532d; color: #4ade80; }
+        .badge-azair { background: #1e1b4b; color: #818cf8; }
+        .badge-esky { background: #164e63; color: #22d3ee; }
+
+        /* Sources hit bar */
+        .sources-bar {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+        .source-tag {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .source-tag.active { background: #064e3b; color: #34d399; }
+        .source-tag.inactive { background: #1e293b; color: #475569; }
+    </style>
+</head>
+<body>
+    <div class="header" style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+            <h1>Flight Finder</h1>
+            <p>Agregator najtańszych lotów — Ryanair, Wizz Air, AZair, Google Flights, Kiwi, Skyscanner, eSky, SecretFlying, Rainbow, Flippo</p>
+        </div>
+        <nav style="display:flex;gap:8px">
+            <a href="/smart" style="color:#fbbf24;text-decoration:none;padding:8px 16px;border:1px solid #f59e0b;border-radius:8px;font-size:13px;font-weight:600">Smart Trip Planner</a>
+            <a href="/multi" style="color:#a78bfa;text-decoration:none;padding:8px 16px;border:1px solid #7c3aed;border-radius:8px;font-size:13px;font-weight:600">Multi-city Builder</a>
+        </nav>
+    </div>
+    <div class="container">
+        <form class="search-form" id="searchForm" onsubmit="doSearch(event)">
+            <div class="form-group">
+                <label>Lotnisko docelowe (IATA)</label>
+                <input type="text" id="destination" value="FUE" placeholder="np. FUE, TFS, LPA">
+            </div>
+            <div class="form-group">
+                <label>Słowo kluczowe celu</label>
+                <input type="text" id="dest_keyword" value="fuerteventura" placeholder="np. fuerteventura, tenerife">
+            </div>
+            <div class="form-group">
+                <label>Dorośli</label>
+                <input type="number" id="adults" value="2" min="1" max="9">
+            </div>
+            <div class="form-group">
+                <label>Dzieci (2-11 lat)</label>
+                <input type="number" id="children" value="2" min="0" max="9">
+            </div>
+            <div class="form-group">
+                <label>Wylot od</label>
+                <input type="date" id="date_from" value="2027-01-29">
+            </div>
+            <div class="form-group">
+                <label>Wylot do</label>
+                <input type="date" id="date_to" value="2027-02-03">
+            </div>
+            <div class="form-group">
+                <label>Powrót od</label>
+                <input type="date" id="date_ret_from" value="2027-02-10">
+            </div>
+            <div class="form-group">
+                <label>Powrót do</label>
+                <input type="date" id="date_ret_to" value="2027-02-14">
+            </div>
+            <div class="form-group">
+                <label>Max przesiadek</label>
+                <select id="max_stops">
+                    <option value="any">Dowolnie</option>
+                    <option value="0">Tylko bezpośrednie</option>
+                    <option value="1">Max 1</option>
+                    <option value="2">Max 2</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Max cena łączna (PLN)</label>
+                <input type="number" id="max_price" placeholder="np. 4000" value="4000">
+            </div>
+            <div class="form-group" style="grid-column: 1 / -1;">
+                <label>Lotniska wylotu</label>
+                <div class="airports-grid" id="airportsGrid">
+                    {% for code, name in airports.items() %}
+                    <label class="airport-chip selected">
+                        <input type="checkbox" name="origins" value="{{ code }}" checked>
+                        <strong>{{ code }}</strong> {{ name }}
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+            <button type="submit" class="btn-search" id="btnSearch">Szukaj najtańszych lotów</button>
+        </form>
+
+        <div id="results"></div>
+    </div>
+
+    <script>
+        // Airport chip toggle
+        document.querySelectorAll('.airport-chip').forEach(chip => {
+            chip.addEventListener('click', function(e) {
+                if (e.target.tagName === 'INPUT') return;
+                const cb = this.querySelector('input');
+                cb.checked = !cb.checked;
+                this.classList.toggle('selected', cb.checked);
+            });
+        });
+
+        async function doSearch(e) {
+            e.preventDefault();
+            const btn = document.getElementById('btnSearch');
+            const resultsDiv = document.getElementById('results');
+            btn.disabled = true;
+            btn.textContent = 'Szukam...';
+            resultsDiv.innerHTML = '<div class="loading"><div class="spinner"></div><p>Przeszukuję Ryanair, Wizz Air, AZair, SecretFlying, Rainbow Tours...</p><p style="font-size:12px;color:#475569;margin-top:8px">Generuję linki do Google Flights, Kiwi, Skyscanner, eSky, Flippo</p></div>';
+
+            const origins = Array.from(document.querySelectorAll('input[name="origins"]:checked')).map(cb => cb.value);
+            const payload = {
+                origins,
+                destination: document.getElementById('destination').value,
+                dest_keyword: document.getElementById('dest_keyword').value,
+                adults: document.getElementById('adults').value,
+                children: document.getElementById('children').value,
+                date_from: document.getElementById('date_from').value,
+                date_to: document.getElementById('date_to').value,
+                date_ret_from: document.getElementById('date_ret_from').value,
+                date_ret_to: document.getElementById('date_ret_to').value,
+                max_stops: document.getElementById('max_stops').value,
+                max_price: document.getElementById('max_price').value,
+            };
+
+            try {
+                const resp = await fetch('/search', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload),
+                });
+                const data = await resp.json();
+                renderResults(data);
+            } catch (err) {
+                resultsDiv.innerHTML = `<div class="error-bar">Błąd: ${err.message}</div>`;
+            }
+            btn.disabled = false;
+            btn.textContent = 'Szukaj najtańszych lotów';
+        }
+
+        // Global state for sorting & export
+        let lastData = null;
+        let sortCol = 'total_price_pln';
+        let sortDir = 'asc';
+
+        const ALL_SOURCES = ['Ryanair', 'Ryanair RT', 'Wizz Air', 'AZair', 'SecretFlying', 'Rainbow Tours'];
+
+        function priceClass(total) {
+            if (total <= 0) return '';
+            if (total <= 3000) return 'price-good';
+            if (total <= 5000) return 'price-ok';
+            return 'price-bad';
+        }
+
+        function badgeClass(source) {
+            if (source === 'SecretFlying') return 'badge-error-fare';
+            if (source === 'Rainbow Tours') return 'badge-charter';
+            if (source === 'Ryanair RT') return 'badge-roundtrip';
+            if (source === 'AZair') return 'badge-azair';
+            return 'badge-source';
+        }
+
+        function exportCSV() {
+            if (!lastData || !lastData.results.length) return;
+            fetch('/export-csv', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({results: lastData.results}),
+            }).then(r => r.blob()).then(blob => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `flights_${new Date().toISOString().slice(0,10)}.csv`;
+                a.click();
+                URL.revokeObjectURL(url);
+            });
+        }
+
+        function openAllLinks() {
+            if (!lastData) return;
+            lastData.links.forEach((l, i) => {
+                setTimeout(() => window.open(l.url, '_blank'), i * 300);
+            });
+        }
+
+        function sortTable(col) {
+            if (sortCol === col) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+            else { sortCol = col; sortDir = 'asc'; }
+            renderResults(lastData);
+        }
+
+        function renderResults(data) {
+            lastData = data;
+            const { results, links, errors, sources_hit } = data;
+            const dest = data.search_params.destination;
+            let html = '';
+
+            // Errors
+            if (errors.length) {
+                html += `<div class="error-bar">Ostrzeżenia: ${errors.join('; ')}</div>`;
+            }
+
+            // Sources status bar
+            html += '<div class="sources-bar">';
+            ALL_SOURCES.forEach(s => {
+                const active = (sources_hit || []).includes(s);
+                html += `<span class="source-tag ${active ? 'active' : 'inactive'}">${active ? '&#10003;' : '&#10007;'} ${s}</span>`;
+            });
+            html += '</div>';
+
+            // Summary cards
+            const apiResults = results.filter(r => r.total_price_pln > 0);
+            const directResults = apiResults.filter(r => r.direct === true);
+            const roundtrips = apiResults.filter(r => r.source === 'Ryanair RT');
+            const cheapest = apiResults[0];
+            const cheapestDirect = directResults[0];
+            const cheapestRT = roundtrips[0];
+
+            html += '<div class="summary-cards">';
+            html += `<div class="summary-card">
+                <h4>Wyniki z API</h4>
+                <div class="value">${apiResults.length}</div>
+                <div class="detail">lotów z ${(sources_hit||[]).length} źródeł</div>
+            </div>`;
+            if (cheapest) {
+                html += `<div class="summary-card">
+                    <h4>Najtańszy lot (${cheapest.pax} os.)</h4>
+                    <div class="value ${priceClass(cheapest.total_price_pln)}">${cheapest.total_price_pln} PLN</div>
+                    <div class="detail">${cheapest.source} · ${cheapest.origin}→${cheapest.destination} · ${cheapest.date}${cheapest.currency !== 'PLN' ? ' ('+cheapest.total_price+' '+cheapest.currency+')' : ''}</div>
+                </div>`;
+            }
+            if (cheapestRT) {
+                html += `<div class="summary-card">
+                    <h4>Najtańszy Ryanair w obie strony</h4>
+                    <div class="value ${priceClass(cheapestRT.total_price_pln)}">${cheapestRT.total_price_pln} PLN</div>
+                    <div class="detail">${cheapestRT.origin}→${cheapestRT.destination} · ${cheapestRT.date}</div>
+                </div>`;
+            } else if (cheapestDirect) {
+                html += `<div class="summary-card">
+                    <h4>Najtańszy bezpośredni</h4>
+                    <div class="value ${priceClass(cheapestDirect.total_price_pln)}">${cheapestDirect.total_price_pln} PLN</div>
+                    <div class="detail">${cheapestDirect.source} · ${cheapestDirect.origin}→${cheapestDirect.destination}</div>
+                </div>`;
+            }
+            html += `<div class="summary-card">
+                <h4>Linki do portali</h4>
+                <div class="value" style="color:#60a5fa">${links.length}</div>
+                <div class="detail">Google Flights, Kiwi, Skyscanner, eSky, AZair, Flippo, Itaka, TUI, Wakacje</div>
+            </div>`;
+            html += '</div>';
+
+            // Action buttons
+            html += `<div class="action-buttons">
+                <button class="btn-action primary" onclick="exportCSV()">&#128190; Eksport CSV</button>
+                <button class="btn-action" onclick="openAllLinks()">&#128279; Otwórz wszystkie portale (${links.length} zakładek)</button>
+                <button class="btn-action" onclick="navigator.clipboard.writeText(JSON.stringify(lastData.results,null,2)).then(()=>alert('Skopiowano JSON!'))">&#128203; Kopiuj JSON</button>
+            </div>`;
+
+            // Sorted results
+            let sorted = [...results];
+            sorted.sort((a, b) => {
+                let va = a[sortCol] ?? 999999, vb = b[sortCol] ?? 999999;
+                if (typeof va === 'string') va = va.toLowerCase();
+                if (typeof vb === 'string') vb = vb.toLowerCase();
+                return sortDir === 'asc' ? (va > vb ? 1 : -1) : (va < vb ? 1 : -1);
+            });
+
+            // Results table
+            const arrow = col => sortCol === col ? (sortDir === 'asc' ? ' &#9650;' : ' &#9660;') : '';
+            if (sorted.length > 0) {
+                html += '<div class="results-header"><h2>Wyniki z API</h2></div>';
+                html += `<div style="overflow-x:auto"><table class="results-table">
+                    <thead><tr>
+                        <th>#</th>
+                        <th onclick="sortTable('source')">Źródło${arrow('source')}</th>
+                        <th>Linia</th>
+                        <th onclick="sortTable('origin')">Skąd${arrow('origin')}</th>
+                        <th>Dokąd</th>
+                        <th onclick="sortTable('date')">Data${arrow('date')}</th>
+                        <th>Typ</th>
+                        <th onclick="sortTable('price_per_person')">Cena/os${arrow('price_per_person')}</th>
+                        <th onclick="sortTable('total_price_pln')">Razem PLN${arrow('total_price_pln')}</th>
+                        <th>Uwagi</th><th>Link</th>
+                    </tr></thead><tbody>`;
+                sorted.forEach((r, i) => {
+                    const directBadge = r.direct === true ? '<span class="badge badge-direct">Direct</span>' :
+                                        r.direct === false ? '<span class="badge badge-stops">Stops</span>' : '—';
+                    const priceDisplay = r.price_per_person > 0
+                        ? r.price_per_person + ' ' + r.currency + (r.currency !== 'PLN' ? ' (~'+r.price_per_person_pln+' PLN)' : '')
+                        : '—';
+                    const totalDisplay = r.total_price_pln > 0 ? r.total_price_pln + ' PLN' : '—';
+                    html += `<tr>
+                        <td>${i + 1}</td>
+                        <td><span class="badge ${badgeClass(r.source)}">${r.source}</span></td>
+                        <td>${r.airline}</td>
+                        <td><strong>${r.origin}</strong></td>
+                        <td>${r.destination}</td>
+                        <td>${r.date}</td>
+                        <td>${directBadge}</td>
+                        <td>${priceDisplay}</td>
+                        <td class="price-total ${priceClass(r.total_price_pln)}">${totalDisplay}</td>
+                        <td style="max-width:220px;font-size:11px">${r.notes || ''}</td>
+                        <td><a href="${r.link}" target="_blank" class="book-link">Otwórz</a></td>
+                    </tr>`;
+                });
+                html += '</tbody></table></div>';
+            } else {
+                html += '<div class="error-bar">Brak wyników z API. Sprawdź linki poniżej — ręczne portale mogą mieć oferty.</div>';
+            }
+
+            // External links
+            html += `<div class="ext-links">
+                <h3>Szukaj ręcznie — linki do portali</h3>
+                <p style="font-size:12px;color:#64748b;margin-bottom:12px">Kliknij aby otworzyć z wypełnionymi parametrami lub użyj przycisku "Otwórz wszystkie" powyżej.</p>
+                <div class="ext-links-grid">`;
+            links.forEach(l => {
+                html += `<a href="${l.url}" target="_blank" class="ext-link-card">
+                    <span class="source-name">${l.source}</span>
+                    <span>${l.origin} → ${dest}</span>
+                </a>`;
+            });
+            html += `<a href="https://www.secretflying.com/?s=${data.search_params.dest_keyword}" target="_blank" class="ext-link-card">
+                <span class="source-name">SecretFlying</span>
+                <span>Error fares</span>
+            </a>`;
+            html += `<a href="https://r.pl/wyszukiwarka?destination=${data.search_params.dest_keyword}" target="_blank" class="ext-link-card">
+                <span class="source-name">Rainbow</span>
+                <span>Czartery</span>
+            </a>`;
+            html += '</div></div>';
+
+            document.getElementById('results').innerHTML = html;
+        }
+    </script>
+</body>
+</html>

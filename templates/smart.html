@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Trip Planner — Flight Finder</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0a0e27; color: #e0e0e0; min-height: 100vh; }
+        .header { background: linear-gradient(135deg, #1a1f4e 0%, #0d3b66 100%); padding: 24px 32px; border-bottom: 2px solid #f59e0b; display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { font-size: 28px; color: #fbbf24; }
+        .header p { color: #94a3b8; font-size: 14px; margin-top: 4px; }
+        .header nav { display: flex; gap: 8px; }
+        .header nav a { color: #60a5fa; text-decoration: none; padding: 8px 14px; border: 1px solid #334155; border-radius: 8px; font-size: 13px; }
+        .header nav a:hover { background: #1e293b; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 24px; }
+
+        .explainer { background: linear-gradient(135deg, #1a1533 0%, #111535 100%); border: 1px solid #f59e0b33; border-radius: 12px; padding: 20px; margin-bottom: 24px; }
+        .explainer h3 { color: #fbbf24; margin-bottom: 8px; }
+        .explainer p { font-size: 13px; color: #94a3b8; line-height: 1.6; }
+        .explainer .example { background: #1e293b; border-radius: 8px; padding: 12px; margin-top: 10px; font-size: 13px; }
+        .explainer .example span { color: #fbbf24; font-weight: 600; }
+
+        .search-form { background: #111535; border: 1px solid #1e293b; border-radius: 12px; padding: 24px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+        .form-group { display: flex; flex-direction: column; gap: 6px; }
+        .form-group label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; font-weight: 600; }
+        .form-group input, .form-group select { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 12px; color: #e2e8f0; font-size: 15px; outline: none; }
+        .form-group input:focus { border-color: #f59e0b; }
+        .form-group.full { grid-column: 1 / -1; }
+        .dest-input { font-size: 18px !important; padding: 14px !important; border-color: #f59e0b66 !important; }
+        .dest-input::placeholder { color: #475569; }
+
+        /* Suggestions */
+        .suggestions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+        .sug-chip { background: #1e293b; border: 1px solid #334155; border-radius: 16px; padding: 5px 12px; font-size: 12px; color: #94a3b8; cursor: pointer; transition: all 0.15s; }
+        .sug-chip:hover { border-color: #f59e0b; color: #fbbf24; }
+
+        .btn-search { grid-column: 1 / -1; background: linear-gradient(135deg, #f59e0b, #d97706); color: #0a0e27; border: none; border-radius: 10px; padding: 14px 32px; font-size: 16px; font-weight: 700; cursor: pointer; }
+        .btn-search:hover { background: linear-gradient(135deg, #fbbf24, #f59e0b); }
+        .btn-search:disabled { opacity: 0.6; cursor: wait; }
+
+        /* Results */
+        .stats-bar { display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+        .stat { background: #111535; border: 1px solid #1e293b; border-radius: 10px; padding: 16px 20px; min-width: 150px; }
+        .stat h4 { color: #64748b; font-size: 11px; text-transform: uppercase; margin-bottom: 4px; }
+        .stat .val { font-size: 22px; font-weight: 700; color: #fbbf24; }
+        .stat .detail { font-size: 11px; color: #64748b; margin-top: 2px; }
+
+        /* Route cards */
+        .route-card { background: #111535; border: 1px solid #1e293b; border-radius: 12px; margin-bottom: 16px; overflow: hidden; transition: border-color 0.2s; }
+        .route-card:hover { border-color: #f59e0b; }
+        .route-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; background: #0f1330; }
+        .route-rank { font-size: 20px; font-weight: 700; color: #64748b; margin-right: 16px; }
+        .route-hub-name { font-size: 16px; font-weight: 600; color: #fbbf24; }
+        .route-hub-sub { font-size: 12px; color: #94a3b8; }
+        .route-price { text-align: right; }
+        .route-price .europe { font-size: 20px; font-weight: 700; color: #22c55e; }
+        .route-price .pp { font-size: 12px; color: #94a3b8; }
+
+        .route-body { padding: 16px 20px; }
+        .route-legs { display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; align-items: center; }
+        .leg { background: #1e293b; border-radius: 10px; padding: 14px; }
+        .leg-label { font-size: 11px; text-transform: uppercase; color: #64748b; margin-bottom: 6px; }
+        .leg-route { font-size: 15px; font-weight: 600; }
+        .leg-detail { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+        .leg-price { font-size: 16px; font-weight: 700; color: #22c55e; margin-top: 6px; }
+        .leg-arrow { font-size: 24px; color: #f59e0b; text-align: center; }
+
+        .route-links { display: flex; gap: 8px; padding: 12px 20px; background: #0f1330; border-top: 1px solid #1e293b; }
+        .route-link { padding: 6px 14px; background: #1e293b; border-radius: 8px; color: #60a5fa; text-decoration: none; font-size: 12px; font-weight: 600; transition: background 0.15s; }
+        .route-link:hover { background: #2d3a52; }
+        .route-link.primary { background: #f59e0b33; color: #fbbf24; }
+
+        /* Direct links section */
+        .direct-section { background: #111535; border: 1px solid #1e293b; border-radius: 12px; padding: 20px; margin-top: 24px; }
+        .direct-section h3 { color: #60a5fa; margin-bottom: 12px; }
+        .direct-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 8px; }
+        .direct-link { display: flex; align-items: center; gap: 8px; background: #1e293b; border-radius: 8px; padding: 10px 14px; text-decoration: none; color: #e2e8f0; font-size: 13px; transition: all 0.15s; }
+        .direct-link:hover { background: #2d3a52; }
+        .direct-link .src { color: #60a5fa; font-weight: 600; min-width: 100px; }
+
+        .loading { text-align: center; padding: 60px; color: #64748b; }
+        .spinner { width: 40px; height: 40px; border: 3px solid #1e293b; border-top-color: #f59e0b; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .error-bar { background: #451a03; border: 1px solid #9a3412; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; font-size: 13px; color: #fdba74; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <h1>Smart Trip Planner</h1>
+            <p>Wpisz miejsce docelowe — system znajdzie najtańszą trasę z Polski przez europejskie huby</p>
+        </div>
+        <nav>
+            <a href="/">Wyszukiwarka prosta</a>
+            <a href="/multi">Multi-city Builder</a>
+        </nav>
+    </div>
+    <div class="container">
+        <div class="explainer">
+            <h3>Jak to działa?</h3>
+            <p>Wpisz np. <strong>"Tajlandia"</strong> — system automatycznie:<br>
+            1. Rozpoznaje lotniska docelowe (BKK, HKT)<br>
+            2. Wie, które europejskie huby mają tanie loty dalekodystansowe (Helsinki, Stambuł, Oslo...)<br>
+            3. Szuka tanich lotów Ryanair z Polski do tych hubów<br>
+            4. Generuje linki do wyszukiwania lotów hub → cel na Google Flights i Kiwi</p>
+            <div class="example">
+                Przykład: <span>WAW → HEL</span> (Ryanair 199 PLN) + <span>HEL → BKK</span> (Finnair / Google Flights ~1500 PLN) = <span>znacznie taniej niż WAW → BKK bezpośrednio</span>
+            </div>
+        </div>
+
+        <form class="search-form" id="searchForm" onsubmit="doSearch(event)">
+            <div class="form-group full">
+                <label>Dokąd chcesz polecieć?</label>
+                <input type="text" id="destination" class="dest-input" placeholder="np. Tajlandia, Bali, Nowy Jork, Malediwy, Zanzibar..." autocomplete="off">
+                <div class="suggestions" id="suggestions">
+                    {% for dest in dest_map %}
+                    <span class="sug-chip" onclick="document.getElementById('destination').value='{{ dest }}'">{{ dest }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Dorośli</label>
+                <input type="number" id="adults" value="2" min="1" max="9">
+            </div>
+            <div class="form-group">
+                <label>Dzieci (2-11)</label>
+                <input type="number" id="children" value="2" min="0" max="9">
+            </div>
+            <div class="form-group">
+                <label>Wylot od</label>
+                <input type="date" id="date_out_from" value="2026-06-15">
+            </div>
+            <div class="form-group">
+                <label>Wylot do</label>
+                <input type="date" id="date_out_to" value="2026-06-22">
+            </div>
+            <div class="form-group">
+                <label>Powrót od</label>
+                <input type="date" id="date_ret_from" value="2026-06-28">
+            </div>
+            <div class="form-group">
+                <label>Powrót do</label>
+                <input type="date" id="date_ret_to" value="2026-07-05">
+            </div>
+            <div class="form-group">
+                <label>Max przesiadek (w 1 stronę)</label>
+                <select id="max_stops">
+                    <option value="any">Dowolnie</option>
+                    <option value="0">Bez przesiadek (direct z PL)</option>
+                    <option value="1">Max 1 (hub→cel direct)</option>
+                    <option value="2" selected>Max 2 (hub + 1 stop)</option>
+                    <option value="3">Max 3 (hub + 2 stops)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Max budżet łączny (PLN)</label>
+                <input type="number" id="max_budget" placeholder="np. 8000" value="">
+            </div>
+            <div style="grid-column: 1 / -1; display: flex; gap: 12px; flex-wrap: wrap;">
+                <button type="submit" class="btn-search" id="btnSearch" style="flex:1">Znajdź najtańszą trasę</button>
+                <button type="button" class="btn-search" id="btnWarm" onclick="findWarmDestinations()" style="flex:1; background: linear-gradient(135deg, #ef4444, #f59e0b); font-size: 15px;">
+                    ☀ Zabierz mnie tam gdzie jest ciepło!
+                </button>
+            </div>
+        </form>
+
+        <div id="results"></div>
+    </div>
+
+    <script>
+        // Filter suggestion chips
+        document.getElementById('destination').addEventListener('input', function() {
+            const q = this.value.toLowerCase();
+            document.querySelectorAll('.sug-chip').forEach(chip => {
+                chip.style.display = (!q || chip.textContent.toLowerCase().includes(q)) ? '' : 'none';
+            });
+        });
+
+        async function findWarmDestinations() {
+            const btn = document.getElementById('btnWarm');
+            const div = document.getElementById('results');
+            const dateOut = document.getElementById('date_out_from').value;
+            const minTemp = 24;
+
+            btn.disabled = true;
+            btn.textContent = '☀ Szukam ciepłych miejsc...';
+            div.innerHTML = `<div class="loading"><div class="spinner" style="border-top-color:#f59e0b"></div><p>Szukam destynacji z temperaturą powyżej ${minTemp}°C...</p></div>`;
+
+            try {
+                // Step 1: Get warm destinations for the selected dates
+                const warmResp = await fetch('/warm-destinations', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ date: dateOut, min_temp: minTemp }),
+                });
+                const warmData = await warmResp.json();
+                const dests = warmData.destinations;
+
+                if (!dests.length) {
+                    div.innerHTML = '<div class="error-bar">Nie znaleziono ciepłych destynacji na ten okres. Spróbuj inne daty.</div>';
+                    btn.disabled = false;
+                    btn.textContent = '☀ Zabierz mnie tam gdzie jest ciepło!';
+                    return;
+                }
+
+                // Show warm destinations first
+                let html = `<div style="background:linear-gradient(135deg,#451a0333,#f59e0b11);border:1px solid #f59e0b44;border-radius:12px;padding:20px;margin-bottom:24px">
+                    <h3 style="color:#fbbf24;margin-bottom:12px">☀ Ciepłe destynacje w miesiącu ${warmData.month} (min. ${minTemp}°C)</h3>
+                    <div style="display:flex;flex-wrap:wrap;gap:8px">`;
+                dests.forEach(d => {
+                    html += `<div style="background:#1e293b;border-radius:10px;padding:10px 16px;display:flex;align-items:center;gap:8px;cursor:pointer;border:1px solid #334155;transition:all 0.15s"
+                        onclick="document.getElementById('destination').value='${d.keyword}';document.getElementById('searchForm').dispatchEvent(new Event('submit'))"
+                        onmouseover="this.style.borderColor='#f59e0b'" onmouseout="this.style.borderColor='#334155'">
+                        <span style="font-size:24px">${d.emoji}</span>
+                        <div>
+                            <div style="font-weight:600;color:#e2e8f0;font-size:14px">${d.desc}</div>
+                            <div style="font-size:12px;color:#f59e0b;font-weight:600">${d.temp}°C${d.water_temp ? ' · woda ' + d.water_temp + '°C' : ''}</div>
+                        </div>
+                    </div>`;
+                });
+                html += '</div><p style="font-size:12px;color:#64748b;margin-top:12px">Kliknij destynację aby wyszukać loty z prawdziwymi cenami.</p></div>';
+
+                // Step 2: Auto-search top 3 cheapest (smallest destinations by region)
+                const topDests = dests.slice(0, 3);
+                html += `<div class="loading"><div class="spinner" style="border-top-color:#f59e0b"></div><p>Szukam najtańszych lotów do top ${topDests.length} destynacji: ${topDests.map(d => d.desc).join(', ')}...</p>
+                    <p style="font-size:12px;color:#475569;margin-top:4px">To może potrwać 1-2 minuty (scraping cen z Kayak)</p></div>`;
+                div.innerHTML = html;
+
+                // Search each destination
+                let allRoutes = [];
+                for (const dest of topDests) {
+                    try {
+                        const resp = await fetch('/search-smart', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({
+                                destination: dest.keyword,
+                                adults: document.getElementById('adults').value,
+                                children: document.getElementById('children').value,
+                                date_out_from: document.getElementById('date_out_from').value,
+                                date_out_to: document.getElementById('date_out_to').value,
+                                date_ret_from: document.getElementById('date_ret_from').value,
+                                date_ret_to: document.getElementById('date_ret_to').value,
+                                max_stops: document.getElementById('max_stops').value,
+                                max_budget: document.getElementById('max_budget').value,
+                            }),
+                        });
+                        const data = await resp.json();
+                        if (data.routes) {
+                            data.routes.forEach(r => {
+                                r.warm_dest = dest.desc;
+                                r.warm_temp = dest.temp;
+                                r.warm_emoji = dest.emoji;
+                                r.warm_water = dest.water_temp;
+                            });
+                            allRoutes.push(...data.routes);
+                        }
+                    } catch (err) {
+                        console.error(`Error searching ${dest.keyword}:`, err);
+                    }
+                }
+
+                // Sort all routes by price
+                allRoutes.sort((a, b) => a.grand_total - b.grand_total);
+                allRoutes = allRoutes.slice(0, 30);
+
+                // Render with warm destination info
+                const pax = parseInt(document.getElementById('adults').value) + parseInt(document.getElementById('children').value);
+                const fakeData = {
+                    routes: allRoutes,
+                    direct_links: [],
+                    secret_deals: [],
+                    dest_airports: [...new Set(allRoutes.map(r => r.dest_airport))],
+                    hubs_searched: [...new Set(allRoutes.map(r => r.hub))],
+                    hub_fares_found: allRoutes.length,
+                    sources_used: ['Ryanair', 'Kayak (all airlines)'],
+                    params: {
+                        origin: 'PL',
+                        destination: topDests.map(d => d.desc).join(', '),
+                        adults: document.getElementById('adults').value,
+                        children: document.getElementById('children').value,
+                    },
+                };
+
+                // Prepend warm destinations card to results
+                const warmCard = html.split('<div class="loading">')[0];
+                renderResults(fakeData);
+                document.getElementById('results').innerHTML = warmCard + document.getElementById('results').innerHTML;
+
+            } catch (err) {
+                div.innerHTML = `<div class="error-bar">Błąd: ${err.message}</div>`;
+            }
+            btn.disabled = false;
+            btn.textContent = '☀ Zabierz mnie tam gdzie jest ciepło!';
+        }
+
+        async function doSearch(e) {
+            e.preventDefault();
+            const dest = document.getElementById('destination').value.trim();
+            if (!dest) { alert('Wpisz miejsce docelowe!'); return; }
+            const btn = document.getElementById('btnSearch');
+            const div = document.getElementById('results');
+            btn.disabled = true;
+            btn.textContent = `Szukam tras do "${dest}"...`;
+            div.innerHTML = `<div class="loading"><div class="spinner"></div>
+                <p>Szukam najtańszej trasy do: <strong>${dest}</strong></p>
+                <p style="font-size:12px;color:#475569;margin-top:8px">1. Sprawdzam loty Ryanair z Polski do hubów europejskich...<br>
+                2. Pobieram prawdziwe ceny lotów dalekodystansowych z Kayak...<br>
+                <span style="color:#f59e0b">To może potrwać 30-60 sekund (scraping cen w tle)</span></p></div>`;
+
+            try {
+                const resp = await fetch('/search-smart', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        destination: dest,
+                        adults: document.getElementById('adults').value,
+                        children: document.getElementById('children').value,
+                        date_out_from: document.getElementById('date_out_from').value,
+                        date_out_to: document.getElementById('date_out_to').value,
+                        date_ret_from: document.getElementById('date_ret_from').value,
+                        date_ret_to: document.getElementById('date_ret_to').value,
+                        max_stops: document.getElementById('max_stops').value,
+                        max_budget: document.getElementById('max_budget').value,
+                    }),
+                });
+                const data = await resp.json();
+                if (data.error) {
+                    div.innerHTML = `<div class="error-bar">${data.error}</div>`;
+                } else {
+                    renderResults(data);
+                }
+            } catch (err) {
+                div.innerHTML = `<div class="error-bar">Błąd: ${err.message}</div>`;
+            }
+            btn.disabled = false;
+            btn.textContent = 'Znajdź najtańszą trasę';
+        }
+
+        let lastRoutes = [];
+
+        function updateTotal(idx, realPricePP, europePP, pax) {
+            const price = parseFloat(realPricePP);
+            if (!price || price <= 0) return;
+            const totalPP = europePP + price;
+            const grandTotal = totalPP * pax;
+            const el = document.getElementById(`real_total_${idx}`);
+            if (el) {
+                el.innerHTML = `= <strong style="color:#22c55e">${grandTotal.toFixed(0)} PLN</strong> za ${pax} os. (${totalPP.toFixed(0)}/os)`;
+            }
+            // Update the card header price
+            const header = document.getElementById(`route_total_${idx}`);
+            if (header) {
+                const color = grandTotal <= 6000 ? '#22c55e' : grandTotal <= 10000 ? '#eab308' : '#ef4444';
+                header.innerHTML = `<div style="font-size:20px;font-weight:700;color:${color}">${grandTotal.toFixed(0)} PLN</div><div style="font-size:12px;color:#94a3b8">prawdziwa cena ${pax} os. (${totalPP.toFixed(0)} PLN/os)</div>`;
+            }
+        }
+
+        function renderResults(data) {
+            const { routes, direct_links, dest_airports, hubs_searched, hub_fares_found, params } = data;
+            const pax = parseInt(params.adults) + parseInt(params.children);
+            let html = '';
+
+            // Stats
+            const sources = data.sources_used || [];
+            const secretDeals = data.secret_deals || [];
+
+            html += '<div class="stats-bar">';
+            html += `<div class="stat"><h4>Trasy znalezione</h4><div class="val">${routes.length}</div></div>`;
+            html += `<div class="stat"><h4>Hubów sprawdzonych</h4><div class="val">${hubs_searched.length}</div><div class="detail">${hubs_searched.join(', ')}</div></div>`;
+            html += `<div class="stat"><h4>Lotniska docelowe</h4><div class="val">${dest_airports.join(', ')}</div></div>`;
+            html += `<div class="stat"><h4>Źródła cen</h4><div class="val">${sources.length}</div><div class="detail">${sources.join(', ')}</div></div>`;
+            if (routes.length > 0) {
+                html += `<div class="stat"><h4>Najtańszy szacowany (${pax} os.)</h4><div class="val" style="color:#22c55e">~${routes[0].grand_total} PLN</div><div class="detail">Przez ${routes[0].hub} (Europa: ${routes[0].europe_total} + lot: ~${routes[0].longhaul_total})</div></div>`;
+            }
+            html += '</div>';
+
+            const realCount = routes.filter(r => r.price_source === 'kayak').length;
+            if (routes.length > 0 && realCount > 0) {
+                html += `<div style="margin-bottom:16px;background:#064e3b44;border:1px solid #22c55e44;border-radius:10px;padding:16px">
+                    <p style="color:#34d399;font-weight:600;margin-bottom:4px">Pobrano prawdziwe ceny dla ${realCount} tras z Kayak</p>
+                    <p style="font-size:13px;color:#94a3b8">Trasy z zielonym badge "PRAWDZIWA CENA" mają cenę lotu dalekodystansowego pobr. z Kayak. Ceny Ryanair (leg 1 i 4) są zawsze prawdziwe z API.</p>
+                </div>`;
+            } else if (routes.length > 0) {
+                html += `<div style="margin-bottom:16px;background:#111535;border:1px solid #f59e0b44;border-radius:10px;padding:16px">
+                    <p style="color:#fbbf24;font-weight:600;margin-bottom:4px">Ceny lotów dalekodystansowych są szacunkowe</p>
+                    <p style="font-size:13px;color:#94a3b8">Kayak nie zwrócił cen (daty zbyt odległe?). Sprawdź prawdziwe ceny klikając linki przy trasie.</p>
+                </div>`;
+            }
+
+            if (routes.length === 0) {
+                html += '<div class="error-bar">Brak tanich tras Ryanair z Polski do hubów na podane daty. Spróbuj rozszerzyć zakres dat lub sprawdź linki bezpośrednie poniżej.</div>';
+            }
+
+            // Route cards
+            routes.slice(0, 20).forEach((route, i) => {
+                const isReal = route.price_source === 'kayak';
+                const isDirect = route.europe_total === 0;  // Direct from PL, no hub
+                const grandColor = route.grand_total <= 6000 ? '#22c55e' : route.grand_total <= 10000 ? '#eab308' : '#ef4444';
+                const pricePrefix = isReal ? '' : '~';
+                const priceLabel = isReal ? 'cena z Kayak' : 'szacowany koszt';
+                const routeLabel = isDirect
+                    ? `Bezpośrednio z ${route.hub} → ${route.dest_airport}`
+                    : `Przez ${route.hub} → ${route.dest_airport}`;
+                const routeSub = isDirect
+                    ? `${route.hub} ↔ ${route.dest_airport} (bez przesiadek)`
+                    : `${route.pl_to_hub.origin} → ${route.hub} → ${route.dest_airport} → ${route.hub} → ${route.hub_to_pl.dest}`;
+
+                html += `<div class="route-card" style="${isReal ? 'border-color:#22c55e44' : ''}">
+                    <div class="route-header">
+                        <div style="display:flex;align-items:center;gap:12px">
+                            <span class="route-rank">#${i+1}</span>
+                            <div>
+                                <div class="route-hub-name">${routeLabel} ${isReal ? '<span style="background:#064e3b;color:#34d399;padding:2px 8px;border-radius:10px;font-size:11px;margin-left:8px">PRAWDZIWA CENA</span>' : ''}</div>
+                                <div class="route-hub-sub">${routeSub}</div>
+                                <div style="font-size:12px;color:#94a3b8;margin-top:2px">Wylot: <strong style="color:#e2e8f0">${route.date_out || '?'}</strong> · Powrót: <strong style="color:#e2e8f0">${route.date_ret || '?'}</strong> · <span style="color:#fbbf24">${route.trip_days || '?'} dni</span></div>
+                            </div>
+                        </div>
+                        <div class="route-price" id="route_total_${i}">
+                            <div class="europe" style="color:${grandColor}">${pricePrefix}${route.grand_total} PLN</div>
+                            <div class="pp">${priceLabel} ${pax} os. (${route.grand_total_pp} PLN/os)</div>
+                        </div>
+                    </div>
+                    <div class="route-body">
+                        <div class="route-legs" style="${isDirect ? 'grid-template-columns:1fr' : ''}">
+                        ${!isDirect ? `<div class="leg">
+                                <div class="leg-label">✈ Leg 1: Polska → Hub (${route.pl_to_hub.airline || '?'})</div>
+                                <div class="leg-route">${route.pl_to_hub.origin} → ${route.hub}</div>
+                                <div class="leg-detail">${route.pl_to_hub.date} · ${route.pl_to_hub.airline || '?'}</div>
+                                <div class="leg-price">${route.pl_to_hub.price_pp} PLN/os</div>
+                                <a href="${route.pl_to_hub.book_link}" target="_blank" style="font-size:11px;color:#60a5fa;text-decoration:none;margin-top:4px;display:block">Rezerwuj na ${route.pl_to_hub.airline === 'Ryanair' ? 'Ryanair' : 'Kayak'} →</a>
+                            </div>
+                            <div class="leg-arrow">→</div>` : ''}
+                            <div class="leg" style="border:1px solid ${isReal ? '#22c55e44' : '#f59e0b44'}">
+                                <div class="leg-label">${isDirect ? '✈ Lot bezpośredni RT' : '✈ Leg 2+3: Hub ↔ Cel'} ${isReal ? '(cena z Kayak)' : '(szacunek)'}</div>
+                                <div class="leg-route">${isDirect ? route.hub : route.hub} ↔ ${route.dest_airport}</div>
+                                ${isReal
+                                    ? `<div class="leg-price" style="color:#22c55e;font-size:18px">${route.longhaul_pp} PLN/os RT (${route.longhaul_total} za ${pax} os.)</div>
+                                       <div style="font-size:11px;color:#34d399;margin-top:2px">Prawdziwa cena z Kayak — kliknij poniżej aby zarezerwować</div>`
+                                    : `<div class="leg-price" style="color:#f59e0b">~${route.longhaul_pp} PLN/os RT (~${route.longhaul_total} za ${pax} os.)</div>
+                                       <div style="font-size:11px;color:#f59e0b88;margin-top:2px">Szacunek — sprawdź prawdziwą cenę klikając poniżej</div>`
+                                }
+                                <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+                                    <a href="${route.search_links.kayak}" target="_blank" style="font-size:12px;color:${isReal ? '#34d399' : '#fbbf24'};background:${isReal ? '#22c55e22' : '#f59e0b22'};padding:5px 12px;border-radius:6px;text-decoration:none;font-weight:600">${isReal ? 'Rezerwuj na Kayak →' : 'Sprawdź Kayak →'}</a>
+                                    <a href="${route.search_links.google_flights}" target="_blank" style="font-size:12px;color:#60a5fa;background:#2563eb22;padding:5px 12px;border-radius:6px;text-decoration:none">Google Flights</a>
+                                    <a href="${route.search_links.kiwi}" target="_blank" style="font-size:12px;color:#a78bfa;background:#7c3aed22;padding:5px 12px;border-radius:6px;text-decoration:none">Kiwi</a>
+                                    <a href="${route.search_links.skyscanner}" target="_blank" style="font-size:12px;color:#22d3ee;background:#06b6d422;padding:5px 12px;border-radius:6px;text-decoration:none">Skyscanner</a>
+                                </div>
+                            </div>
+                        ${!isDirect ? `
+                            <div class="leg-arrow">→</div>
+                            <div class="leg">
+                                <div class="leg-label">✈ Leg 4: Hub → Polska (${route.hub_to_pl.airline || '?'})</div>
+                                <div class="leg-route">${route.hub} → ${route.hub_to_pl.dest}</div>
+                                <div class="leg-detail">${route.hub_to_pl.date} · ${route.hub_to_pl.airline || '?'}</div>
+                                <div class="leg-price">${route.hub_to_pl.price_pp} PLN/os</div>
+                                <a href="${route.hub_to_pl.book_link}" target="_blank" style="font-size:11px;color:#60a5fa;text-decoration:none;margin-top:4px;display:block">Rezerwuj na ${route.hub_to_pl.airline === 'Ryanair' ? 'Ryanair' : 'Kayak'} →</a>
+                            </div>` : ''}
+                        </div>
+                    </div>
+                    <div class="route-links">
+                        ${isDirect ? `
+                            <a href="${route.search_links.kayak}" target="_blank" class="route-link primary">Rezerwuj na Kayak</a>
+                            <a href="${route.search_links.google_flights}" target="_blank" class="route-link">Google Flights</a>
+                            <a href="${route.search_links.kiwi}" target="_blank" class="route-link">Kiwi</a>
+                            <a href="${route.search_links.skyscanner}" target="_blank" class="route-link">Skyscanner</a>
+                        ` : `
+                            <a href="${route.search_links.kiwi_full}" target="_blank" class="route-link primary">Kiwi: cała trasa ${route.pl_to_hub.origin}→${route.dest_airport}</a>
+                            <a href="${route.search_links.google_flights}" target="_blank" class="route-link">Google: ${route.hub}↔${route.dest_airport}</a>
+                            <a href="${route.pl_to_hub.book_link}" target="_blank" class="route-link">Ryanair: ${route.pl_to_hub.origin}→${route.hub}</a>
+                            <a href="${route.hub_to_pl.book_link}" target="_blank" class="route-link">Ryanair: ${route.hub}→${route.hub_to_pl.dest}</a>
+                        `}
+                    </div>
+                </div>`;
+            });
+
+            // SecretFlying deals
+            if (secretDeals.length > 0) {
+                html += `<div class="direct-section" style="border-color:#f59e0b44">
+                    <h3 style="color:#fbbf24">SecretFlying — Error Fares & Deals</h3>
+                    <p style="font-size:12px;color:#94a3b8;margin-bottom:12px">Aktualne błędy cenowe i promocje z SecretFlying pasujące do Twojej destynacji.</p>
+                    <div class="direct-grid">`;
+                secretDeals.forEach(d => {
+                    html += `<a href="${d.link}" target="_blank" class="direct-link" style="border:1px solid #f59e0b44">
+                        <span class="src" style="color:#fbbf24;min-width:80px">${d.price_per_person > 0 ? d.price_per_person + ' ' + d.currency : 'Deal'}</span>
+                        <span style="font-size:11px">${d.notes || d.date}</span>
+                    </a>`;
+                });
+                html += '</div></div>';
+            }
+
+            // Direct links
+            if (direct_links.length > 0) {
+                html += `<div class="direct-section">
+                    <h3>Loty bezpośrednie z Polski (porównaj z trasą przez hub)</h3>
+                    <p style="font-size:12px;color:#64748b;margin-bottom:12px">Sprawdź czy lot bezpośredni nie wychodzi taniej lub porównywalnie.</p>
+                    <div class="direct-grid">`;
+                direct_links.forEach(l => {
+                    html += `<a href="${l.url}" target="_blank" class="direct-link"><span class="src">${l.source}</span><span>${l.label}</span></a>`;
+                });
+                html += '</div></div>';
+            }
+
+            document.getElementById('results').innerHTML = html;
+        }
+    </script>
+</body>
+</html>
