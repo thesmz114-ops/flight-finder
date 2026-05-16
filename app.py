@@ -2005,161 +2005,29 @@ SEASON_WARNINGS = {
 
 
 def generate_warm_recommendations(results, month, pax):
-    """Generate AI-style recommendations based on scored analysis."""
+    """Generate top 3 concrete trip proposals based on multi-dimensional scoring."""
     if not results or len(results) < 2:
         return []
 
-    recs = []
+    MONTH_NAMES_PL = {1: "styczeń", 2: "luty", 3: "marzec", 4: "kwiecień", 5: "maj", 6: "czerwiec",
+                      7: "lipiec", 8: "sierpień", 9: "wrzesień", 10: "październik", 11: "listopad", 12: "grudzień"}
+    month_name = MONTH_NAMES_PL.get(month, str(month))
 
-    # --- 1. BEST VALUE: price-to-quality ratio ---
+    # Score every result
+    scored = []
     for r in results:
+        traits = DEST_TRAITS.get(r["keyword"], {})
+        price = r.get("grand_total", 99999)
         temp = r.get("temp", 25)
         water = r.get("water_temp", 0) or 0
-        price = r.get("grand_total", 99999)
-        traits = DEST_TRAITS.get(r["keyword"], {})
-
-        # Value score: higher is better (warm + cheap + good traits)
-        weather_score = temp + (water * 0.5 if water > 0 else 0)
-        trait_avg = sum([traits.get(k, 5) for k in ("family", "beach", "food", "safety")]) / 4 if traits else 5
-        r["_value_score"] = (weather_score * trait_avg) / max(price / pax, 1)
-        r["_trait_avg"] = round(trait_avg, 1)
-
-    # Sort by value score
-    by_value = sorted(results, key=lambda x: -x.get("_value_score", 0))
-    best_value = by_value[0]
-    traits_bv = DEST_TRAITS.get(best_value["keyword"], {})
-    tip_bv = traits_bv.get("tip", "")
-    warning_bv = SEASON_WARNINGS.get(best_value["keyword"], {}).get(month, "")
-
-    reason = f'{best_value["temp"]}°C'
-    if best_value.get("water_temp"):
-        reason += f', woda {best_value["water_temp"]}°C'
-    reason += f' — a cena od {round(best_value["grand_total"])} PLN za {pax} os.'
-    if tip_bv:
-        reason += f' {tip_bv}'
-    if warning_bv:
-        reason += f' ⚠️ Uwaga: {warning_bv} w tym okresie.'
-
-    recs.append({
-        "type": "best_value",
-        "icon": "💎",
-        "title": "Najlepszy stosunek jakości do ceny",
-        "dest": best_value["desc"],
-        "keyword": best_value["keyword"],
-        "reason": reason,
-        "grand_total": best_value["grand_total"],
-    })
-
-    # --- 2. CHEAPEST ---
-    cheapest = results[0]  # already sorted by price
-    if cheapest["keyword"] != best_value["keyword"]:
-        traits_ch = DEST_TRAITS.get(cheapest["keyword"], {})
-        tip_ch = traits_ch.get("tip", "")
-        warning_ch = SEASON_WARNINGS.get(cheapest["keyword"], {}).get(month, "")
-        reason_ch = f'Najtańsza opcja — {round(cheapest["grand_total"])} PLN za {pax} os. ({cheapest["temp"]}°C). '
-        reason_ch += f'Trasa: {cheapest["origin"]} → {cheapest["hub"]} (Ryanair) → {cheapest["dest_airports"][0]}.'
-        if tip_ch:
-            reason_ch += f' {tip_ch}'
-        if warning_ch:
-            reason_ch += f' ⚠️ {warning_ch}.'
-
-        recs.append({
-            "type": "cheapest",
-            "icon": "💰",
-            "title": "Najtańsza opcja",
-            "dest": cheapest["desc"],
-            "keyword": cheapest["keyword"],
-            "reason": reason_ch,
-            "grand_total": cheapest["grand_total"],
-        })
-
-    # --- 3. BEST FOR FAMILIES ---
-    family_sorted = sorted(results, key=lambda x: -(DEST_TRAITS.get(x["keyword"], {}).get("family", 5) * 10
-                                                     + DEST_TRAITS.get(x["keyword"], {}).get("safety", 5) * 8
-                                                     - x.get("grand_total", 0) / 1000))
-    best_family = family_sorted[0]
-    traits_fam = DEST_TRAITS.get(best_family["keyword"], {})
-    fam_score = traits_fam.get("family", 5)
-    safety_score = traits_fam.get("safety", 5)
-    tip_fam = traits_fam.get("tip", "")
-
-    reason_fam = f'Bezpieczeństwo {safety_score}/10, przyjazność dla rodzin {fam_score}/10.'
-    if best_family.get("water_temp"):
-        reason_fam += f' Woda {best_family["water_temp"]}°C — dzieci będą się kąpać.'
-    reason_fam += f' Od {round(best_family["grand_total"])} PLN.'
-    if tip_fam:
-        reason_fam += f' {tip_fam}'
-
-    recs.append({
-        "type": "family",
-        "icon": "👨‍👩‍👧‍👦",
-        "title": "Najlepsza dla rodzin z dziećmi",
-        "dest": best_family["desc"],
-        "keyword": best_family["keyword"],
-        "reason": reason_fam,
-        "grand_total": best_family["grand_total"],
-    })
-
-    # --- 4. BEST BEACH ---
-    beach_sorted = sorted(results, key=lambda x: -(x.get("water_temp", 0) or 0) * 10
-                          - (DEST_TRAITS.get(x["keyword"], {}).get("beach", 5))
-                          + x.get("grand_total", 0) / 5000)
-    best_beach = beach_sorted[0]
-    traits_beach = DEST_TRAITS.get(best_beach["keyword"], {})
-    tip_beach = traits_beach.get("tip", "")
-
-    reason_beach = f'Plaże {traits_beach.get("beach", "?")}/10'
-    if best_beach.get("water_temp"):
-        reason_beach += f', woda {best_beach["water_temp"]}°C'
-    reason_beach += f', powietrze {best_beach["temp"]}°C. Od {round(best_beach["grand_total"])} PLN.'
-    if tip_beach:
-        reason_beach += f' {tip_beach}'
-
-    if best_beach["keyword"] not in [r["keyword"] for r in recs]:
-        recs.append({
-            "type": "beach",
-            "icon": "🏖",
-            "title": "Najlepsze plaże i woda",
-            "dest": best_beach["desc"],
-            "keyword": best_beach["keyword"],
-            "reason": reason_beach,
-            "grand_total": best_beach["grand_total"],
-        })
-
-    # --- 5. ADVENTURE / CULTURE pick ---
-    advent_sorted = sorted(results, key=lambda x: -(DEST_TRAITS.get(x["keyword"], {}).get("adventure", 5)
-                                                     + DEST_TRAITS.get(x["keyword"], {}).get("culture", 5))
-                           + x.get("grand_total", 0) / 3000)
-    best_advent = advent_sorted[0]
-    traits_adv = DEST_TRAITS.get(best_advent["keyword"], {})
-    tip_adv = traits_adv.get("tip", "")
-
-    reason_adv = f'Przygoda {traits_adv.get("adventure", "?")}/10, kultura {traits_adv.get("culture", "?")}/10, kuchnia {traits_adv.get("food", "?")}/10.'
-    reason_adv += f' Od {round(best_advent["grand_total"])} PLN.'
-    if tip_adv:
-        reason_adv += f' {tip_adv}'
-
-    if best_advent["keyword"] not in [r["keyword"] for r in recs]:
-        recs.append({
-            "type": "adventure",
-            "icon": "🗺",
-            "title": "Najbardziej przygodowa / kulturowa",
-            "dest": best_advent["desc"],
-            "keyword": best_advent["keyword"],
-            "reason": reason_adv,
-            "grand_total": best_advent["grand_total"],
-        })
-
-    # --- 6. MY TOP PICK — weighted overall score ---
-    for r in results:
-        traits = DEST_TRAITS.get(r["keyword"], {})
-        price_norm = max(0, 1 - r.get("grand_total", 10000) / 20000)  # 0-1, cheaper=better
-        temp_norm = min(1, r.get("temp", 25) / 32)
-        water_norm = min(1, (r.get("water_temp", 0) or 0) / 30)
         warning = SEASON_WARNINGS.get(r["keyword"], {}).get(month)
-        season_penalty = 0.3 if warning else 0
 
-        overall = (
+        price_norm = max(0, 1 - price / 20000)
+        temp_norm = min(1, temp / 32)
+        water_norm = min(1, water / 30)
+        season_penalty = 0.25 if warning else 0
+
+        score = (
             price_norm * 30 +
             temp_norm * 15 +
             water_norm * 10 +
@@ -2171,60 +2039,82 @@ def generate_warm_recommendations(results, month, pax):
             traits.get("culture", 5) * 1 +
             (3 if traits.get("visa_free") else 0)
         ) - (season_penalty * 20)
-        r["_overall"] = round(overall, 1)
 
-    top_pick = max(results, key=lambda x: x.get("_overall", 0))
-    traits_top = DEST_TRAITS.get(top_pick["keyword"], {})
-    tip_top = traits_top.get("tip", "")
-    warning_top = SEASON_WARNINGS.get(top_pick["keyword"], {}).get(month, "")
+        scored.append({**r, "_score": round(score, 1), "_traits": traits, "_warning": warning})
 
-    highlights = []
-    if traits_top.get("food", 0) >= 9:
-        highlights.append("wybitna kuchnia")
-    if traits_top.get("safety", 0) >= 9:
-        highlights.append("bardzo bezpieczne")
-    if traits_top.get("beach", 0) >= 9:
-        highlights.append("przepiękne plaże")
-    if traits_top.get("culture", 0) >= 9:
-        highlights.append("bogata kultura")
-    if traits_top.get("visa_free"):
-        highlights.append("bez wizy")
+    # Sort by score descending — top 3 become proposals
+    scored.sort(key=lambda x: -x["_score"])
 
-    reason_top = f'Mój wybór na {MONTH_NAMES_PL.get(month, str(month))}. '
-    reason_top += f'{top_pick["temp"]}°C'
-    if top_pick.get("water_temp"):
-        reason_top += f', woda {top_pick["water_temp"]}°C'
-    reason_top += f'. '
-    if highlights:
-        reason_top += ', '.join(highlights).capitalize() + '. '
-    reason_top += f'Od {round(top_pick["grand_total"])} PLN za {pax} os.'
-    if tip_top:
-        reason_top += f' {tip_top}'
-    if warning_top:
-        reason_top += f' ⚠️ Uwaga: {warning_top}.'
+    proposals = []
+    labels = ["🥇 Moja TOP rekomendacja", "🥈 Świetna alternatywa", "🥉 Też warto rozważyć"]
+    colors = ["#f59e0b", "#94a3b8", "#cd7f32"]
 
-    MONTH_NAMES_PL = {1: "styczeń", 2: "luty", 3: "marzec", 4: "kwiecień", 5: "maj", 6: "czerwiec",
-                      7: "lipiec", 8: "sierpień", 9: "wrzesień", 10: "październik", 11: "listopad", 12: "grudzień"}
+    for i, r in enumerate(scored[:3]):
+        traits = r["_traits"]
+        warning = r["_warning"]
+        tip = traits.get("tip", "")
 
-    # Insert as first recommendation
-    recs.insert(0, {
-        "type": "top_pick",
-        "icon": "🏆",
-        "title": "Moja rekomendacja",
-        "dest": top_pick["desc"],
-        "keyword": top_pick["keyword"],
-        "reason": reason_top,
-        "grand_total": top_pick["grand_total"],
-        "score": top_pick["_overall"],
-    })
+        # Build highlights
+        highlights = []
+        if traits.get("food", 0) >= 9: highlights.append("🍜 wybitna kuchnia")
+        if traits.get("safety", 0) >= 9: highlights.append("🛡 bardzo bezpieczne")
+        if traits.get("beach", 0) >= 9: highlights.append("🏖 piękne plaże")
+        if traits.get("culture", 0) >= 9: highlights.append("🏛 bogata kultura")
+        if traits.get("adventure", 0) >= 9: highlights.append("🗺 dużo przygód")
+        if traits.get("family", 0) >= 9: highlights.append("👨‍👩‍👧‍👦 idealne dla rodzin")
+        if traits.get("visa_free"): highlights.append("✅ bez wizy")
 
-    # Cleanup internal scores
+        # Why this trip
+        why_parts = []
+        if i == 0:
+            why_parts.append(f"Najlepszy wynik w mojej analizie na {month_name}")
+        why_parts.append(f"{r['temp']}°C powietrze" + (f", {r['water_temp']}°C woda" if r.get("water_temp") else ""))
+        if traits.get("family", 0) >= 8 and traits.get("safety", 0) >= 8:
+            why_parts.append("świetne z dziećmi")
+        if r.get("grand_total", 0) <= 5000:
+            why_parts.append("budżetowa opcja")
+        elif r.get("grand_total", 0) <= 8000:
+            why_parts.append("dobra cena za egzotykę")
+
+        why = ". ".join(why_parts) + "."
+        if tip:
+            why += f" {tip}"
+        if warning:
+            why += f" ⚠️ Uwaga: {warning} w tym okresie."
+
+        proposals.append({
+            "rank": i + 1,
+            "label": labels[i],
+            "color": colors[i],
+            "dest": r["desc"],
+            "emoji": r["emoji"],
+            "keyword": r["keyword"],
+            "temp": r["temp"],
+            "water_temp": r.get("water_temp", 0),
+            "origin": r["origin"],
+            "hub": r["hub"],
+            "dest_airport": r["dest_airports"][0] if r.get("dest_airports") else "",
+            "out_date": r.get("out_date", ""),
+            "ret_date": r.get("ret_date", ""),
+            "out_pp": r.get("out_pp", 0),
+            "ret_pp": r.get("ret_pp", 0),
+            "est_hub_dest_pp": r.get("est_hub_dest_pp", 0),
+            "total_pp": r.get("total_pp", 0),
+            "grand_total": r.get("grand_total", 0),
+            "pax": pax,
+            "highlights": highlights,
+            "why": why,
+            "links": r.get("links", {}),
+            "score": r["_score"],
+        })
+
+    # Cleanup
     for r in results:
-        r.pop("_value_score", None)
-        r.pop("_trait_avg", None)
-        r.pop("_overall", None)
+        r.pop("_score", None)
+        r.pop("_traits", None)
+        r.pop("_warning", None)
 
-    return recs
+    return proposals
 
 
 # ---------------------------------------------------------------------------

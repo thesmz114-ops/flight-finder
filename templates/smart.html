@@ -227,43 +227,73 @@
             }
             let html = '';
 
-            // AI Recommendations
+            // AI Trip Proposals — top 3 concrete offers
             if (recommendations && recommendations.length) {
                 html += `<div style="background:linear-gradient(135deg,#1a0533,#0d1b3e);border:1px solid #8b5cf644;border-radius:14px;padding:24px;margin-bottom:24px">
-                    <h3 style="color:#c084fc;margin-bottom:4px;font-size:18px">🤖 Analiza AI — co bym polecił</h3>
-                    <p style="font-size:12px;color:#7c3aed;margin-bottom:16px">Wielowymiarowa analiza: cena × pogoda × bezpieczeństwo × plaże × kuchnia × kultura × sezon</p>
-                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:12px">`;
-                recommendations.forEach(rec => {
-                    const bgMap = {
-                        top_pick: 'linear-gradient(135deg,#422006,#1c1917)',
-                        best_value: 'linear-gradient(135deg,#052e16,#1c1917)',
-                        cheapest: 'linear-gradient(135deg,#172554,#1c1917)',
-                        family: 'linear-gradient(135deg,#3b0764,#1c1917)',
-                        beach: 'linear-gradient(135deg,#0c4a6e,#1c1917)',
-                        adventure: 'linear-gradient(135deg,#431407,#1c1917)',
-                    };
-                    const borderMap = {
-                        top_pick: '#f59e0b',
-                        best_value: '#22c55e',
-                        cheapest: '#3b82f6',
-                        family: '#a855f7',
-                        beach: '#06b6d4',
-                        adventure: '#f97316',
-                    };
-                    const bg = bgMap[rec.type] || 'linear-gradient(135deg,#1e293b,#1c1917)';
-                    const border = borderMap[rec.type] || '#475569';
-                    html += `<div style="background:${bg};border:1px solid ${border}44;border-radius:12px;padding:16px;transition:border-color 0.2s;cursor:pointer"
-                        onclick="document.getElementById('destination').value='${rec.keyword}';document.getElementById('searchForm').dispatchEvent(new Event('submit'))"
-                        onmouseover="this.style.borderColor='${border}'" onmouseout="this.style.borderColor='${border}44'">
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-                            <div style="font-size:13px;font-weight:700;color:${border}">${rec.icon} ${rec.title}</div>
-                            <div style="font-size:14px;font-weight:700;color:#fbbf24">${Math.round(rec.grand_total)} PLN</div>
+                    <h3 style="color:#c084fc;margin-bottom:4px;font-size:18px">🤖 Moje propozycje wyjazdów</h3>
+                    <p style="font-size:12px;color:#7c3aed;margin-bottom:20px">Analiza: cena × pogoda × bezpieczeństwo × plaże × kuchnia × kultura × sezon</p>`;
+
+                recommendations.forEach(p => {
+                    const priceColor = p.grand_total <= 5000 ? '#22c55e' : p.grand_total <= 8000 ? '#f59e0b' : '#f97316';
+                    html += `<div style="background:linear-gradient(135deg,#111535,#0f1330);border:2px solid ${p.color}44;border-radius:14px;margin-bottom:16px;overflow:hidden;transition:border-color 0.2s"
+                        onmouseover="this.style.borderColor='${p.color}'" onmouseout="this.style.borderColor='${p.color}44'">
+
+                        <!-- Header -->
+                        <div style="background:linear-gradient(135deg,${p.color}15,transparent);padding:16px 20px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #1e293b">
+                            <div style="display:flex;align-items:center;gap:14px">
+                                <span style="font-size:36px">${p.emoji}</span>
+                                <div>
+                                    <div style="font-size:13px;font-weight:700;color:${p.color}">${p.label}</div>
+                                    <div style="font-size:22px;font-weight:700;color:#e2e8f0">${p.dest}</div>
+                                    <div style="font-size:13px;color:#94a3b8;margin-top:2px">🌡 ${p.temp}°C${p.water_temp ? ' · 🌊 woda ' + p.water_temp + '°C' : ''}</div>
+                                </div>
+                            </div>
+                            <div style="text-align:right">
+                                <div style="font-size:28px;font-weight:800;color:${priceColor}">${Math.round(p.grand_total)} PLN</div>
+                                <div style="font-size:12px;color:#94a3b8">${Math.round(p.total_pp)} PLN/os × ${p.pax} os.</div>
+                            </div>
                         </div>
-                        <div style="font-size:16px;font-weight:700;color:#e2e8f0;margin-bottom:6px">${rec.dest}</div>
-                        <div style="font-size:12px;color:#94a3b8;line-height:1.5">${rec.reason}</div>
+
+                        <!-- Route breakdown -->
+                        <div style="padding:16px 20px;display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+                            <div style="background:#1e293b;border-radius:10px;padding:12px 16px;flex:1;min-width:180px">
+                                <div style="font-size:11px;color:#64748b;text-transform:uppercase;margin-bottom:4px">🇵🇱 Wylot z Polski</div>
+                                <div style="font-size:16px;font-weight:700;color:#e2e8f0">${p.origin} → ${p.hub}</div>
+                                <div style="font-size:12px;color:#94a3b8">Ryanair · ${p.out_date}</div>
+                                <div style="font-size:15px;font-weight:700;color:#22c55e;margin-top:4px">${Math.round(p.out_pp)} PLN/os</div>
+                            </div>
+                            <div style="font-size:20px;color:${p.color}">✈→</div>
+                            <div style="background:#1e293b;border-radius:10px;padding:12px 16px;flex:1;min-width:180px">
+                                <div style="font-size:11px;color:#64748b;text-transform:uppercase;margin-bottom:4px">✈ Hub → Destynacja</div>
+                                <div style="font-size:16px;font-weight:700;color:#e2e8f0">${p.hub} → ${p.dest_airport}</div>
+                                <div style="font-size:12px;color:#94a3b8">Różne linie · w obie strony</div>
+                                <div style="font-size:15px;font-weight:700;color:#f59e0b;margin-top:4px">~${Math.round(p.est_hub_dest_pp)} PLN/os <span style="font-size:11px;color:#64748b">(szacunek)</span></div>
+                            </div>
+                            <div style="font-size:20px;color:${p.color}">✈→</div>
+                            <div style="background:#1e293b;border-radius:10px;padding:12px 16px;flex:1;min-width:180px">
+                                <div style="font-size:11px;color:#64748b;text-transform:uppercase;margin-bottom:4px">🇵🇱 Powrót</div>
+                                <div style="font-size:16px;font-weight:700;color:#e2e8f0">${p.hub} → ${p.origin}</div>
+                                <div style="font-size:12px;color:#94a3b8">Ryanair · ${p.ret_date}</div>
+                                <div style="font-size:15px;font-weight:700;color:#22c55e;margin-top:4px">${Math.round(p.ret_pp)} PLN/os</div>
+                            </div>
+                        </div>
+
+                        <!-- Highlights & Why -->
+                        <div style="padding:0 20px 12px">
+                            ${p.highlights.length ? '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">' + p.highlights.map(h => '<span style="background:#1e293b;border:1px solid #334155;border-radius:16px;padding:3px 10px;font-size:11px;color:#94a3b8">' + h + '</span>').join('') + '</div>' : ''}
+                            <div style="font-size:13px;color:#94a3b8;line-height:1.6">${p.why}</div>
+                        </div>
+
+                        <!-- Booking links -->
+                        <div style="display:flex;gap:8px;padding:12px 20px;background:#0f1330;border-top:1px solid #1e293b;flex-wrap:wrap">
+                            <a href="${p.links.ryanair_out}" target="_blank" class="route-link primary">Kup Ryanair ${p.origin}→${p.hub}</a>
+                            <a href="${p.links.ryanair_ret}" target="_blank" class="route-link primary">Kup Ryanair ${p.hub}→${p.origin}</a>
+                            <a href="${p.links.google_flights}" target="_blank" class="route-link">Google Flights ${p.hub}→${p.dest_airport}</a>
+                            <a href="${p.links.kiwi_full}" target="_blank" class="route-link">Kiwi pełna trasa</a>
+                        </div>
                     </div>`;
                 });
-                html += '</div></div>';
+                html += '</div>';
             }
 
             // Header
