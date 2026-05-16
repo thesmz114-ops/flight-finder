@@ -2295,6 +2295,7 @@ def warm_search(params):
     children = params.get("children", 2)
     pax = adults + children
     min_temp = params.get("min_temp", 24)
+    max_stops = params.get("max_stops")  # None=any, 0=direct only, 1=max 1 stop
     max_budget = params.get("max_budget")
 
     try:
@@ -2372,7 +2373,13 @@ def warm_search(params):
         if iata not in charter_by_dest or cf["price_pp"] < charter_by_dest[iata]["price_pp"]:
             charter_by_dest[iata] = cf
 
-    # Step 4: For each warm destination, find cheapest route (Ryanair + Wizz Air + charters)
+    # Step 4: For each warm destination, find cheapest route
+    # max_stops filtering:
+    #   0 = direct from Poland only → skip hub routes, only charters
+    #   1 = max 1 stop → hub route OK (PL→Hub direct, Hub→Dest direct)
+    #   None/any = all options
+    skip_hub_routes = (max_stops == 0)  # direct only = no hub routing
+
     results = []
     for wd in warm_dests:
         dest_info = DESTINATION_HUB_MAP.get(wd["keyword"], {})
@@ -2382,7 +2389,7 @@ def warm_search(params):
         best = None
         alternatives = []
 
-        for hub in hubs:
+        for hub in ([] if skip_hub_routes else hubs):
             for origin in origins_to_check:
                 out_fares = fare_cache_out.get((origin, hub), [])
                 ret_fares = fare_cache_ret.get((hub, origin), [])
@@ -2533,6 +2540,9 @@ def warm_search(params):
         "pax": pax,
         "hubs_checked": len(all_hubs),
         "origins_checked": origins_to_check,
+        "max_stops": max_stops,
+        "max_budget": max_budget,
+        "charters_found": len(charter_flights),
     }
 
 
@@ -2540,13 +2550,14 @@ def warm_search(params):
 def warm_search_endpoint():
     data = request.json or {}
     params = {
-        "date_out_from": data.get("date_out_from", "2026-06-15"),
-        "date_out_to": data.get("date_out_to", "2026-06-22"),
-        "date_ret_from": data.get("date_ret_from", "2026-06-28"),
-        "date_ret_to": data.get("date_ret_to", "2026-07-05"),
+        "date_out_from": data.get("date_out_from", "2026-12-25"),
+        "date_out_to": data.get("date_out_to", "2026-12-27"),
+        "date_ret_from": data.get("date_ret_from", "2027-01-08"),
+        "date_ret_to": data.get("date_ret_to", "2027-01-10"),
         "adults": int(data.get("adults", 2)),
         "children": int(data.get("children", 2)),
         "min_temp": int(data.get("min_temp", 24)),
+        "max_stops": int(data.get("max_stops")) if data.get("max_stops") not in (None, "", "any") else None,
         "max_budget": int(data.get("max_budget")) if data.get("max_budget") else None,
     }
     result = warm_search(params)
