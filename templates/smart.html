@@ -219,7 +219,7 @@
         }
 
         function renderWarmResults(data) {
-            const { results, month_name, min_temp, pax, hubs_checked } = data;
+            const { results, recommendations, month_name, min_temp, pax, hubs_checked } = data;
             const div = document.getElementById('results');
             if (!results || !results.length) {
                 div.innerHTML = '<div class="error-bar">Nie znaleziono ciepłych destynacji z lotami na te daty. Spróbuj inne daty lub niższą temperaturę.</div>';
@@ -227,9 +227,48 @@
             }
             let html = '';
 
+            // AI Recommendations
+            if (recommendations && recommendations.length) {
+                html += `<div style="background:linear-gradient(135deg,#1a0533,#0d1b3e);border:1px solid #8b5cf644;border-radius:14px;padding:24px;margin-bottom:24px">
+                    <h3 style="color:#c084fc;margin-bottom:4px;font-size:18px">🤖 Analiza AI — co bym polecił</h3>
+                    <p style="font-size:12px;color:#7c3aed;margin-bottom:16px">Wielowymiarowa analiza: cena × pogoda × bezpieczeństwo × plaże × kuchnia × kultura × sezon</p>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:12px">`;
+                recommendations.forEach(rec => {
+                    const bgMap = {
+                        top_pick: 'linear-gradient(135deg,#422006,#1c1917)',
+                        best_value: 'linear-gradient(135deg,#052e16,#1c1917)',
+                        cheapest: 'linear-gradient(135deg,#172554,#1c1917)',
+                        family: 'linear-gradient(135deg,#3b0764,#1c1917)',
+                        beach: 'linear-gradient(135deg,#0c4a6e,#1c1917)',
+                        adventure: 'linear-gradient(135deg,#431407,#1c1917)',
+                    };
+                    const borderMap = {
+                        top_pick: '#f59e0b',
+                        best_value: '#22c55e',
+                        cheapest: '#3b82f6',
+                        family: '#a855f7',
+                        beach: '#06b6d4',
+                        adventure: '#f97316',
+                    };
+                    const bg = bgMap[rec.type] || 'linear-gradient(135deg,#1e293b,#1c1917)';
+                    const border = borderMap[rec.type] || '#475569';
+                    html += `<div style="background:${bg};border:1px solid ${border}44;border-radius:12px;padding:16px;transition:border-color 0.2s;cursor:pointer"
+                        onclick="document.getElementById('destination').value='${rec.keyword}';document.getElementById('searchForm').dispatchEvent(new Event('submit'))"
+                        onmouseover="this.style.borderColor='${border}'" onmouseout="this.style.borderColor='${border}44'">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                            <div style="font-size:13px;font-weight:700;color:${border}">${rec.icon} ${rec.title}</div>
+                            <div style="font-size:14px;font-weight:700;color:#fbbf24">${Math.round(rec.grand_total)} PLN</div>
+                        </div>
+                        <div style="font-size:16px;font-weight:700;color:#e2e8f0;margin-bottom:6px">${rec.dest}</div>
+                        <div style="font-size:12px;color:#94a3b8;line-height:1.5">${rec.reason}</div>
+                    </div>`;
+                });
+                html += '</div></div>';
+            }
+
             // Header
             html += `<div style="background:linear-gradient(135deg,#451a0322,#f59e0b11);border:1px solid #f59e0b44;border-radius:12px;padding:20px;margin-bottom:24px">
-                <h3 style="color:#fbbf24;margin-bottom:8px">☀ Ciepłe destynacje — ${month_name} (min. ${min_temp}°C) — posortowane od najtańszego</h3>
+                <h3 style="color:#fbbf24;margin-bottom:8px">☀ Wszystkie ciepłe destynacje — ${month_name} (min. ${min_temp}°C) — posortowane od najtańszego</h3>
                 <p style="font-size:13px;color:#94a3b8">Znaleziono <strong style="color:#e2e8f0">${results.length}</strong> destynacji z temperaturą powyżej ${min_temp}°C · Sprawdzono <strong style="color:#e2e8f0">${hubs_checked}</strong> hubów · Ceny dla <strong style="color:#e2e8f0">${pax}</strong> osób</p>
                 <p style="font-size:11px;color:#64748b;margin-top:6px">Ceny PL → Hub to realne ceny Ryanair. Ceny Hub → Destynacja to szacunki — kliknij linki aby sprawdzić.</p>
             </div>`;
