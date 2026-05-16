@@ -303,6 +303,14 @@
                 html += '</div>';
             }
 
+            // Progress bar
+            html += `<div id="price-progress" style="background:#111535;border:1px solid #f59e0b44;border-radius:10px;padding:14px 20px;margin-bottom:16px">
+                <div style="display:flex;align-items:center;gap:12px">
+                    <div style="flex:1;height:6px;background:#1e293b;border-radius:3px"></div>
+                    <span style="font-size:12px;color:#f59e0b">⏳ Zaraz zaczynam pobierać ceny Hub↔Dest...</span>
+                </div>
+            </div>`;
+
             // Header
             html += `<div style="background:linear-gradient(135deg,#451a0322,#f59e0b11);border:1px solid #f59e0b44;border-radius:12px;padding:20px;margin-bottom:24px">
                 <h3 style="color:#fbbf24;margin-bottom:8px">☀ Wszystkie ciepłe destynacje — ${month_name} (min. ${min_temp}°C)</h3>
@@ -381,6 +389,24 @@
             fetchHubDestPrices(recommendations || [], results, pax);
         }
 
+        let pricesFetched = 0;
+        let pricesToFetch = 0;
+
+        function updateProgressBar() {
+            const bar = document.getElementById('price-progress');
+            if (!bar) return;
+            const pct = pricesToFetch > 0 ? Math.round((pricesFetched / pricesToFetch) * 100) : 0;
+            bar.innerHTML = `<div style="display:flex;align-items:center;gap:12px">
+                <div style="flex:1;height:6px;background:#1e293b;border-radius:3px;overflow:hidden">
+                    <div style="width:${pct}%;height:100%;background:linear-gradient(90deg,#f59e0b,#22c55e);border-radius:3px;transition:width 0.5s"></div>
+                </div>
+                <span style="font-size:12px;color:#94a3b8;white-space:nowrap">${pricesFetched === pricesToFetch ? '✅ Wszystkie ceny pobrane!' : '⏳ Pobieram ceny Hub↔Dest z Kayak: ' + pricesFetched + '/' + pricesToFetch + '...'}</span>
+            </div>`;
+            if (pricesFetched === pricesToFetch) {
+                bar.style.borderColor = '#22c55e44';
+            }
+        }
+
         async function fetchHubDestPrices(recs, results, pax) {
             // Collect all unique hub-dest pairs to fetch
             const toFetch = [];
@@ -419,9 +445,13 @@
                 seen[key].push(f);
             });
 
-            // Fetch in parallel (max 3 concurrent to avoid overload)
+            pricesToFetch = unique.length;
+            pricesFetched = 0;
+            updateProgressBar();
+
+            // Fetch in parallel (max 5 concurrent)
             const queue = [...unique];
-            const workers = Math.min(3, queue.length);
+            const workers = Math.min(5, queue.length);
 
             async function worker() {
                 while (queue.length > 0) {
@@ -457,6 +487,8 @@
                         const targets = seen[key] || [];
                         targets.forEach(t => updatePriceCardError(t, ''));
                     }
+                    pricesFetched++;
+                    updateProgressBar();
                 }
             }
 
