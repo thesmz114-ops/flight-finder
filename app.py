@@ -1954,6 +1954,199 @@ def warm_destinations():
     return jsonify({"destinations": results, "month": month, "min_temp": min_temp})
 
 
+# ---------------------------------------------------------------------------
+# WARM SEARCH — find cheapest flights to all warm destinations
+# ---------------------------------------------------------------------------
+def warm_search(params):
+    """Search all warm destinations: real Ryanair prices PL→hub + estimated hub→dest."""
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    date_out_from = params["date_out_from"]
+    date_out_to = params["date_out_to"]
+    date_ret_from = params["date_ret_from"]
+    date_ret_to = params["date_ret_to"]
+    adults = params.get("adults", 2)
+    children = params.get("children", 2)
+    pax = adults + children
+    min_temp = params.get("min_temp", 24)
+    max_budget = params.get("max_budget")
+
+    try:
+        month = int(date_out_from.split("-")[1])
+    except Exception:
+        month = 6
+
+    # Step 1: Filter warm destinations
+    warm_dests = []
+    for key, info in WARM_DESTINATIONS.items():
+        temp = info["temps"].get(month, 0)
+        if temp >= min_temp and key in DESTINATION_HUB_MAP:
+            warm_dests.append({
+                "keyword": key,
+                "desc": info["desc"],
+                "emoji": info["emoji"],
+                "temp": temp,
+                "water_temp": info.get("water", 0),
+            })
+
+    if not warm_dests:
+        return {"results": [], "month": month, "min_temp": min_temp, "pax": pax}
+
+    # Step 2: Collect all unique hubs across warm destinations
+    all_hubs = set()
+    for wd in warm_dests:
+        dest_info = DESTINATION_HUB_MAP.get(wd["keyword"], {})
+        for hub in dest_info.get("hubs", []):
+            all_hubs.add(hub)
+
+    origins_to_check = POLISH_ORIGINS[:4]  # WAW, WMI, KRK, GDN
+
+    # Step 3: Fetch all Ryanair fares in parallel (deduplicated)
+    fare_cache_out = {}  # (origin, hub) -> list of {date, price}
+    fare_cache_ret = {}  # (hub, origin) -> list of {date, price}
+    cache_lock = threading.Lock()
+
+    def fetch_out(origin, hub):
+        fares = ryanair_cheapest_fares(origin, hub, date_out_from, date_out_to)
+        with cache_lock:
+            fare_cache_out[(origin, hub)] = fares
+
+    def fetch_ret(hub, origin):
+        fares = ryanair_cheapest_fares(hub, origin, date_ret_from, date_ret_to)
+        with cache_lock:
+            fare_cache_ret[(hub, origin)] = fares
+
+    tasks = []
+    with ThreadPoolExecutor(max_workers=20) as executor:
+        for origin in origins_to_check:
+            for hub in all_hubs:
+                tasks.append(executor.submit(fetch_out, origin, hub))
+                tasks.append(executor.submit(fetch_ret, hub, origin))
+        # Wait for all
+        for t in as_completed(tasks, timeout=30):
+            try:
+                t.result(timeout=1)
+            except Exception:
+                pass
+
+    log.info(f"Warm search: fetched {len(fare_cache_out)} outbound + {len(fare_cache_ret)} return fare sets for {len(all_hubs)} hubs × {len(origins_to_check)} origins")
+
+    # Step 4: For each warm destination, find cheapest route
+    results = []
+    for wd in warm_dests:
+        dest_info = DESTINATION_HUB_MAP.get(wd["keyword"], {})
+        hubs = dest_info.get("hubs", [])
+        dest_airports = dest_info.get("airports", [])
+        region = dest_info.get("region", "")
+        est_prices = dest_info.get("est_prices", EST_HUB_PRICES.get(region, {}))
+
+        best = None
+        alternatives = []
+
+        for hub in hubs:
+            est_hub_dest_pp = est_prices.get(hub, DEFAULT_EST_PRICE)
+            for origin in origins_to_check:
+                out_fares = fare_cache_out.get((origin, hub), [])
+                ret_fares = fare_cache_ret.get((hub, origin), [])
+                if not out_fares or not ret_fares:
+                    continue
+
+                cheapest_out = min(out_fares, key=lambda f: f.get("price", 99999))
+                cheapest_ret = min(ret_fares, key=lambda f: f.get("price", 99999))
+                out_pp = cheapest_out.get("price", 99999)
+                ret_pp = cheapest_ret.get("price", 99999)
+
+                if out_pp >= 99999 or ret_pp >= 99999:
+                    continue
+
+                total_pp = out_pp + ret_pp + est_hub_dest_pp
+                grand_total = round(total_pp * pax, 2)
+
+                route = {
+                    "hub": hub,
+                    "origin": origin,
+                    "out_pp": out_pp,
+                    "ret_pp": ret_pp,
+                    "est_hub_dest_pp": est_hub_dest_pp,
+                    "total_pp": round(total_pp, 2),
+                    "grand_total": grand_total,
+                    "out_date": cheapest_out.get("date", date_out_from),
+                    "ret_date": cheapest_ret.get("date", date_ret_from),
+                }
+
+                if best is None or grand_total < best["grand_total"]:
+                    if best:
+                        alternatives.append(best)
+                    best = route
+                else:
+                    alternatives.append(route)
+
+        if best is None:
+            continue
+
+        if max_budget and best["grand_total"] > max_budget:
+            continue
+
+        # Sort alternatives by price, keep top 3
+        alternatives.sort(key=lambda x: x["grand_total"])
+        alternatives = alternatives[:3]
+
+        primary_dest = dest_airports[0] if dest_airports else ""
+        results.append({
+            **wd,
+            "dest_airports": dest_airports,
+            "hub": best["hub"],
+            "origin": best["origin"],
+            "out_pp": best["out_pp"],
+            "ret_pp": best["ret_pp"],
+            "est_hub_dest_pp": best["est_hub_dest_pp"],
+            "total_pp": best["total_pp"],
+            "grand_total": best["grand_total"],
+            "out_date": best["out_date"],
+            "ret_date": best["ret_date"],
+            "pax": pax,
+            "alternatives": alternatives,
+            "links": {
+                "ryanair_out": f"https://www.ryanair.com/pl/pl/trip/flights/select?adults={adults}&teens=0&children={children}&infants=0&dateOut={best['out_date']}&originIata={best['origin']}&destinationIata={best['hub']}",
+                "ryanair_ret": f"https://www.ryanair.com/pl/pl/trip/flights/select?adults={adults}&teens=0&children={children}&infants=0&dateOut={best['ret_date']}&originIata={best['hub']}&destinationIata={best['origin']}",
+                "google_flights": build_google_flights_url(best["hub"], primary_dest, date_out_from, date_ret_from, adults, children),
+                "kiwi_full": f"https://www.kiwi.com/pl/search/tiles/{best['origin'].lower()}/{primary_dest.lower()}/{date_out_from}/{date_ret_from}?adults={adults}&children={children}&sortBy=price",
+            },
+        })
+
+    results.sort(key=lambda x: x["grand_total"])
+
+    MONTH_NAMES_PL = {1: "styczeń", 2: "luty", 3: "marzec", 4: "kwiecień", 5: "maj", 6: "czerwiec",
+                      7: "lipiec", 8: "sierpień", 9: "wrzesień", 10: "październik", 11: "listopad", 12: "grudzień"}
+
+    return {
+        "results": results,
+        "month": month,
+        "month_name": MONTH_NAMES_PL.get(month, str(month)),
+        "min_temp": min_temp,
+        "pax": pax,
+        "hubs_checked": len(all_hubs),
+        "origins_checked": origins_to_check,
+    }
+
+
+@app.route("/warm-search", methods=["POST"])
+def warm_search_endpoint():
+    data = request.json or {}
+    params = {
+        "date_out_from": data.get("date_out_from", "2026-06-15"),
+        "date_out_to": data.get("date_out_to", "2026-06-22"),
+        "date_ret_from": data.get("date_ret_from", "2026-06-28"),
+        "date_ret_to": data.get("date_ret_to", "2026-07-05"),
+        "adults": int(data.get("adults", 2)),
+        "children": int(data.get("children", 2)),
+        "min_temp": int(data.get("min_temp", 24)),
+        "max_budget": int(data.get("max_budget")) if data.get("max_budget") else None,
+    }
+    result = warm_search(params)
+    return jsonify(result)
+
+
 @app.route("/smart")
 def smart_page():
     return render_template("smart.html", dest_map=list(DESTINATION_HUB_MAP.keys()))

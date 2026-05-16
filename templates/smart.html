@@ -180,119 +180,115 @@
         async function findWarmDestinations() {
             const btn = document.getElementById('btnWarm');
             const div = document.getElementById('results');
-            const dateOut = document.getElementById('date_out_from').value;
-            const minTemp = 24;
 
             btn.disabled = true;
-            btn.textContent = '☀ Szukam ciepłych miejsc...';
-            div.innerHTML = `<div class="loading"><div class="spinner" style="border-top-color:#f59e0b"></div><p>Szukam destynacji z temperaturą powyżej ${minTemp}°C...</p></div>`;
+            btn.textContent = '☀ Sprawdzam pogodę i ceny Ryanair...';
+            div.innerHTML = `<div class="loading"><div class="spinner" style="border-top-color:#f59e0b"></div>
+                <p>Sprawdzam pogodę i szukam najtańszych lotów do ciepłych destynacji...</p>
+                <p style="font-size:12px;color:#475569;margin-top:4px">Sprawdzam ceny Ryanair z Polski do hubów na całym świecie (~10-15s)</p></div>`;
 
             try {
-                // Step 1: Get warm destinations for the selected dates
-                const warmResp = await fetch('/warm-destinations', {
+                const resp = await fetch('/warm-search', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ date: dateOut, min_temp: minTemp }),
-                });
-                const warmData = await warmResp.json();
-                const dests = warmData.destinations;
-
-                if (!dests.length) {
-                    div.innerHTML = '<div class="error-bar">Nie znaleziono ciepłych destynacji na ten okres. Spróbuj inne daty.</div>';
-                    btn.disabled = false;
-                    btn.textContent = '☀ Zabierz mnie tam gdzie jest ciepło!';
-                    return;
-                }
-
-                // Show warm destinations first
-                let html = `<div style="background:linear-gradient(135deg,#451a0333,#f59e0b11);border:1px solid #f59e0b44;border-radius:12px;padding:20px;margin-bottom:24px">
-                    <h3 style="color:#fbbf24;margin-bottom:12px">☀ Ciepłe destynacje w miesiącu ${warmData.month} (min. ${minTemp}°C)</h3>
-                    <div style="display:flex;flex-wrap:wrap;gap:8px">`;
-                dests.forEach(d => {
-                    html += `<div style="background:#1e293b;border-radius:10px;padding:10px 16px;display:flex;align-items:center;gap:8px;cursor:pointer;border:1px solid #334155;transition:all 0.15s"
-                        onclick="document.getElementById('destination').value='${d.keyword}';document.getElementById('searchForm').dispatchEvent(new Event('submit'))"
-                        onmouseover="this.style.borderColor='#f59e0b'" onmouseout="this.style.borderColor='#334155'">
-                        <span style="font-size:24px">${d.emoji}</span>
-                        <div>
-                            <div style="font-weight:600;color:#e2e8f0;font-size:14px">${d.desc}</div>
-                            <div style="font-size:12px;color:#f59e0b;font-weight:600">${d.temp}°C${d.water_temp ? ' · woda ' + d.water_temp + '°C' : ''}</div>
-                        </div>
-                    </div>`;
-                });
-                html += '</div><p style="font-size:12px;color:#64748b;margin-top:12px">Kliknij destynację aby wyszukać loty z prawdziwymi cenami.</p></div>';
-
-                // Step 2: Auto-search top 3 cheapest (smallest destinations by region)
-                const topDests = dests.slice(0, 3);
-                html += `<div class="loading"><div class="spinner" style="border-top-color:#f59e0b"></div><p>Szukam najtańszych lotów do top ${topDests.length} destynacji: ${topDests.map(d => d.desc).join(', ')}...</p>
-                    <p style="font-size:12px;color:#475569;margin-top:4px">To może potrwać 1-2 minuty (scraping cen z Kayak)</p></div>`;
-                div.innerHTML = html;
-
-                // Search each destination
-                let allRoutes = [];
-                for (const dest of topDests) {
-                    try {
-                        const resp = await fetch('/search-smart', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({
-                                destination: dest.keyword,
-                                adults: document.getElementById('adults').value,
-                                children: document.getElementById('children').value,
-                                date_out_from: document.getElementById('date_out_from').value,
-                                date_out_to: document.getElementById('date_out_to').value,
-                                date_ret_from: document.getElementById('date_ret_from').value,
-                                date_ret_to: document.getElementById('date_ret_to').value,
-                                max_stops: document.getElementById('max_stops').value,
-                                max_budget: document.getElementById('max_budget').value,
-                            }),
-                        });
-                        const data = await resp.json();
-                        if (data.routes) {
-                            data.routes.forEach(r => {
-                                r.warm_dest = dest.desc;
-                                r.warm_temp = dest.temp;
-                                r.warm_emoji = dest.emoji;
-                                r.warm_water = dest.water_temp;
-                            });
-                            allRoutes.push(...data.routes);
-                        }
-                    } catch (err) {
-                        console.error(`Error searching ${dest.keyword}:`, err);
-                    }
-                }
-
-                // Sort all routes by price
-                allRoutes.sort((a, b) => a.grand_total - b.grand_total);
-                allRoutes = allRoutes.slice(0, 30);
-
-                // Render with warm destination info
-                const pax = parseInt(document.getElementById('adults').value) + parseInt(document.getElementById('children').value);
-                const fakeData = {
-                    routes: allRoutes,
-                    direct_links: [],
-                    secret_deals: [],
-                    dest_airports: [...new Set(allRoutes.map(r => r.dest_airport))],
-                    hubs_searched: [...new Set(allRoutes.map(r => r.hub))],
-                    hub_fares_found: allRoutes.length,
-                    sources_used: ['Ryanair', 'Kayak (all airlines)'],
-                    params: {
-                        origin: 'PL',
-                        destination: topDests.map(d => d.desc).join(', '),
+                    body: JSON.stringify({
+                        date_out_from: document.getElementById('date_out_from').value,
+                        date_out_to: document.getElementById('date_out_to').value,
+                        date_ret_from: document.getElementById('date_ret_from').value,
+                        date_ret_to: document.getElementById('date_ret_to').value,
                         adults: document.getElementById('adults').value,
                         children: document.getElementById('children').value,
-                    },
-                };
-
-                // Prepend warm destinations card to results
-                const warmCard = html.split('<div class="loading">')[0];
-                renderResults(fakeData);
-                document.getElementById('results').innerHTML = warmCard + document.getElementById('results').innerHTML;
-
+                        min_temp: 24,
+                        max_budget: document.getElementById('max_budget').value,
+                    }),
+                });
+                const data = await resp.json();
+                renderWarmResults(data);
             } catch (err) {
                 div.innerHTML = `<div class="error-bar">Błąd: ${err.message}</div>`;
             }
             btn.disabled = false;
             btn.textContent = '☀ Zabierz mnie tam gdzie jest ciepło!';
+        }
+
+        function warmPriceClass(total) {
+            if (total <= 4000) return '#22c55e';
+            if (total <= 7000) return '#f59e0b';
+            if (total <= 10000) return '#f97316';
+            return '#ef4444';
+        }
+
+        function renderWarmResults(data) {
+            const { results, month_name, min_temp, pax, hubs_checked } = data;
+            const div = document.getElementById('results');
+            if (!results || !results.length) {
+                div.innerHTML = '<div class="error-bar">Nie znaleziono ciepłych destynacji z lotami na te daty. Spróbuj inne daty lub niższą temperaturę.</div>';
+                return;
+            }
+            let html = '';
+
+            // Header
+            html += `<div style="background:linear-gradient(135deg,#451a0322,#f59e0b11);border:1px solid #f59e0b44;border-radius:12px;padding:20px;margin-bottom:24px">
+                <h3 style="color:#fbbf24;margin-bottom:8px">☀ Ciepłe destynacje — ${month_name} (min. ${min_temp}°C) — posortowane od najtańszego</h3>
+                <p style="font-size:13px;color:#94a3b8">Znaleziono <strong style="color:#e2e8f0">${results.length}</strong> destynacji z temperaturą powyżej ${min_temp}°C · Sprawdzono <strong style="color:#e2e8f0">${hubs_checked}</strong> hubów · Ceny dla <strong style="color:#e2e8f0">${pax}</strong> osób</p>
+                <p style="font-size:11px;color:#64748b;margin-top:6px">Ceny PL → Hub to realne ceny Ryanair. Ceny Hub → Destynacja to szacunki — kliknij linki aby sprawdzić.</p>
+            </div>`;
+
+            // Result cards
+            results.forEach((r, i) => {
+                const priceColor = warmPriceClass(r.grand_total);
+                html += `<div class="route-card">
+                    <div class="route-header">
+                        <div style="display:flex;align-items:center;gap:16px">
+                            <span class="route-rank">#${i+1}</span>
+                            <span style="font-size:32px">${r.emoji}</span>
+                            <div>
+                                <div class="route-hub-name">${r.desc}</div>
+                                <div class="route-hub-sub">${r.temp}°C${r.water_temp ? ' · woda ' + r.water_temp + '°C' : ''} · ${r.dest_airports.join(', ')}</div>
+                            </div>
+                        </div>
+                        <div class="route-price">
+                            <div class="europe" style="color:${priceColor}">${Math.round(r.grand_total)} PLN</div>
+                            <div class="pp">${Math.round(r.total_pp)} PLN/os × ${pax} os.</div>
+                        </div>
+                    </div>
+                    <div class="route-body">
+                        <div class="route-legs">
+                            <div class="leg">
+                                <div class="leg-label">🇵🇱 Polska → Hub</div>
+                                <div class="leg-route">${r.origin} → ${r.hub}</div>
+                                <div class="leg-detail">Ryanair · ${r.out_date}</div>
+                                <div class="leg-price">${Math.round(r.out_pp)} PLN/os</div>
+                            </div>
+                            <div class="leg-arrow">✈ →</div>
+                            <div class="leg">
+                                <div class="leg-label">Hub → Destynacja (szacunek)</div>
+                                <div class="leg-route">${r.hub} → ${r.dest_airports[0]}</div>
+                                <div class="leg-detail">Różne linie · w obie strony</div>
+                                <div class="leg-price" style="color:#f59e0b">~${Math.round(r.est_hub_dest_pp)} PLN/os (RT)</div>
+                            </div>
+                        </div>
+                        <div style="margin-top:10px;padding-top:10px;border-top:1px solid #1e293b;font-size:12px;color:#64748b">
+                            Powrót ${r.hub} → ${r.origin}: <strong style="color:#22c55e">${Math.round(r.ret_pp)} PLN/os</strong> (Ryanair · ${r.ret_date})`;
+
+                if (r.alternatives && r.alternatives.length) {
+                    html += ` · Inne trasy: `;
+                    r.alternatives.forEach(alt => {
+                        html += `<span style="margin-left:6px;color:#94a3b8">${alt.origin}→${alt.hub} ${Math.round(alt.grand_total)} PLN</span>`;
+                    });
+                }
+                html += `</div>
+                    </div>
+                    <div class="route-links">
+                        <a href="${r.links.ryanair_out}" target="_blank" class="route-link primary">Ryanair ${r.origin}→${r.hub}</a>
+                        <a href="${r.links.ryanair_ret}" target="_blank" class="route-link primary">Ryanair ${r.hub}→${r.origin}</a>
+                        <a href="${r.links.google_flights}" target="_blank" class="route-link">Google Flights ${r.hub}→${r.dest_airports[0]}</a>
+                        <a href="${r.links.kiwi_full}" target="_blank" class="route-link">Kiwi pełna trasa</a>
+                    </div>
+                </div>`;
+            });
+
+            div.innerHTML = html;
         }
 
         async function doSearch(e) {
