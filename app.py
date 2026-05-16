@@ -2319,12 +2319,15 @@ def warm_search(params):
     if not warm_dests:
         return {"results": [], "month": month, "min_temp": min_temp, "pax": pax}
 
-    # Step 2: Collect all unique hubs across warm destinations
+    # Step 2: Collect all unique hubs + destination airports for direct flight search
     all_hubs = set()
     for wd in warm_dests:
         dest_info = DESTINATION_HUB_MAP.get(wd["keyword"], {})
         for hub in dest_info.get("hubs", []):
             all_hubs.add(hub)
+        # Also add destination airports (for direct flight search from Poland)
+        for ap in dest_info.get("airports", []):
+            all_hubs.add(ap)
 
     origins_to_check = POLISH_ORIGINS[:4]  # WAW, WMI, KRK, GDN
 
@@ -2388,6 +2391,42 @@ def warm_search(params):
 
         best = None
         alternatives = []
+
+        # If direct only (max_stops=0), search direct flights PL → destination airports
+        if skip_hub_routes:
+            for dest_ap in dest_airports:
+                for origin in origins_to_check:
+                    out_fares = fare_cache_out.get((origin, dest_ap), [])
+                    ret_fares = fare_cache_ret.get((dest_ap, origin), [])
+                    if not out_fares or not ret_fares:
+                        continue
+                    cheapest_out = min(out_fares, key=lambda f: f.get("price", 99999))
+                    cheapest_ret = min(ret_fares, key=lambda f: f.get("price", 99999))
+                    out_pp = cheapest_out.get("price", 99999)
+                    ret_pp = cheapest_ret.get("price", 99999)
+                    if out_pp >= 99999 or ret_pp >= 99999:
+                        continue
+                    pl_direct_rt_pp = out_pp + ret_pp
+                    pl_direct_rt_total = round(pl_direct_rt_pp * pax, 2)
+                    route = {
+                        "hub": dest_ap,  # "hub" is actually destination
+                        "origin": origin,
+                        "out_pp": out_pp,
+                        "ret_pp": ret_pp,
+                        "out_airline": cheapest_out.get("airline", "Ryanair"),
+                        "ret_airline": cheapest_ret.get("airline", "Ryanair"),
+                        "ryanair_rt_pp": round(pl_direct_rt_pp, 2),
+                        "ryanair_rt_total": pl_direct_rt_total,
+                        "out_date": cheapest_out.get("date", date_out_from),
+                        "ret_date": cheapest_ret.get("date", date_ret_from),
+                        "is_direct": True,
+                    }
+                    if best is None or pl_direct_rt_total < best["ryanair_rt_total"]:
+                        if best:
+                            alternatives.append(best)
+                        best = route
+                    else:
+                        alternatives.append(route)
 
         for hub in ([] if skip_hub_routes else hubs):
             for origin in origins_to_check:
