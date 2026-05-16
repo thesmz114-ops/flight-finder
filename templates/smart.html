@@ -435,8 +435,8 @@
             // Header
             html += `<div style="background:linear-gradient(135deg,#451a0322,#f59e0b11);border:1px solid #f59e0b44;border-radius:12px;padding:20px;margin-bottom:24px">
                 <h3 style="color:#fbbf24;margin-bottom:8px">☀ Wszystkie ciepłe destynacje — ${month_name} (min. ${min_temp}°C)</h3>
-                <p style="font-size:13px;color:#94a3b8">Znaleziono <strong style="color:#e2e8f0">${results.length}</strong> destynacji · Sprawdzono <strong style="color:#e2e8f0">${hubs_checked}</strong> hubów · Posortowane od najtańszego lotu PL↔Hub</p>
-                <p style="font-size:11px;color:#22c55e;margin-top:6px">✅ Wszystkie ceny to potwierdzone ceny Ryanair. Cenę Hub↔Destynacja sprawdź przez linki.</p>
+                <p style="font-size:13px;color:#94a3b8">Znaleziono <strong style="color:#e2e8f0">${results.length}</strong> destynacji · Posortowane: z cenami na górze, reszta po temperaturze</p>
+                ${results.filter(r => !r.has_price).length > 0 ? '<p style="font-size:11px;color:#f59e0b;margin-top:6px">⚠ Część destynacji nie ma jeszcze otwartej sprzedaży biletów na te daty — linki do sprawdzenia gdy się pojawią.</p>' : ''}
             </div>`;
 
             // Result cards

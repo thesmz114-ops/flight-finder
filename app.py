@@ -2566,12 +2566,22 @@ def warm_search(params):
             "links": links,
         })
 
-    results.sort(key=lambda x: x["ryanair_rt_total"])
+    # Mark which results have actual prices
+    for r in results:
+        has_price = (r.get("ryanair_rt_total", 0) > 0) or (r.get("charter") is not None)
+        r["has_price"] = has_price
+
+    # Sort: results WITH prices first (by grand_total), then WITHOUT prices (by temp desc)
+    results.sort(key=lambda x: (
+        0 if x["has_price"] else 1,
+        x["grand_total"] if x["has_price"] else 0,
+        -x.get("temp", 0),
+    ))
 
     MONTH_NAMES_PL = {1: "styczeń", 2: "luty", 3: "marzec", 4: "kwiecień", 5: "maj", 6: "czerwiec",
                       7: "lipiec", 8: "sierpień", 9: "wrzesień", 10: "październik", 11: "listopad", 12: "grudzień"}
 
-    # AI recommendations
+    # AI recommendations — top 3 picks (uses scoring, not just price)
     recommendations = generate_warm_recommendations(results, month, pax)
 
     return {
