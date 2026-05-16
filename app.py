@@ -2450,16 +2450,11 @@ def warm_search(params):
                         "source": "Rainbow Charter",
                     }
 
-        if best is None and charter_offer is None:
-            continue
-
         if max_budget:
             if best and best["ryanair_rt_total"] > max_budget:
                 best = None
             if charter_offer and charter_offer["total"] > max_budget:
                 charter_offer = None
-            if best is None and charter_offer is None:
-                continue
 
         # Sort alternatives by confirmed price, keep top 3
         alternatives.sort(key=lambda x: x["ryanair_rt_total"])
@@ -2481,16 +2476,17 @@ def warm_search(params):
             if best is None or charter_offer["total"] < best["ryanair_rt_total"]:
                 use_charter = True
 
-        if best is None and not use_charter:
-            continue
-
         # Set effective price for sorting
         if use_charter:
             effective_total = charter_offer["total"]
             effective_pp = charter_offer["price_pp"]
-        else:
+        elif best:
             effective_total = best["ryanair_rt_total"]
             effective_pp = best["ryanair_rt_pp"]
+        else:
+            # No flights found — still show destination with links
+            effective_total = 999999
+            effective_pp = 0
 
         results.append({
             **wd,
