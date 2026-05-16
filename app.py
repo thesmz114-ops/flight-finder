@@ -342,6 +342,7 @@ def search_wizzair(origin, dest, date_from, date_to):
                     "price_per_person": price,
                     "currency": "PLN",
                     "direct": True,
+                    "direction": "outbound",
                     "link": f"https://wizzair.com/pl-pl/booking/select-flight/search?departureDate={dep}&departureAirport={origin}&arrivalAirport={dest}&adults=2&children=2",
                     "notes": "Cena bez bagażu",
                 })
@@ -803,6 +804,11 @@ def search_all(params):
     # Combine Ryanair outbound + return into round-trip combos
     roundtrips = combine_ryanair_roundtrips(all_results, adults, children)
     all_results.extend(roundtrips)
+
+    # Remove individual one-way legs when user specified return dates
+    # (round-trip search should only show complete RT combos, not separate legs)
+    if date_ret_from:
+        all_results = [r for r in all_results if r.get("direction") not in ("outbound", "return")]
 
     # Convert EUR prices to PLN for comparison
     pax = adults + children
