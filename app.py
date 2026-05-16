@@ -1658,6 +1658,65 @@ def ryanair_cheapest_fares(origin, dest, date_from, date_to):
     return []
 
 
+def wizzair_cheapest_fares(origin, dest, date_from, date_to):
+    """Get cheapest Wizz Air fare between two airports in date range.
+    Returns same format as ryanair_cheapest_fares."""
+    try:
+        meta = requests.get("https://wizzair.com/static_fe/metadata.json", headers=HEADERS, timeout=8)
+        if meta.status_code != 200:
+            return []
+        api_url = meta.json().get("apiUrl", "")
+        if not api_url:
+            return []
+
+        search_url = f"{api_url}/search/timetable"
+        payload = {
+            "flightList": [{
+                "departureStation": origin,
+                "arrivalStation": dest,
+                "from": date_from,
+                "to": date_to,
+            }],
+            "priceType": "regular",
+            "adultCount": 1,
+            "childCount": 0,
+        }
+        r = requests.post(search_url, json=payload, headers={
+            **HEADERS, "Content-Type": "application/json",
+        }, timeout=12)
+        if r.status_code == 200:
+            data = r.json()
+            fares = []
+            for flight in data.get("outboundFlights", []):
+                dep = flight.get("departureDateTime", "")[:10]
+                price = flight.get("priceType", {}).get("regular", {}).get("amount", 0)
+                if price and price > 0:
+                    fares.append({
+                        "origin": origin,
+                        "dest": dest,
+                        "date": dep,
+                        "price": price,
+                        "currency": "PLN",
+                        "airline": "Wizz Air",
+                    })
+            return fares
+    except Exception:
+        pass
+    return []
+
+
+def all_cheapest_fares(origin, dest, date_from, date_to):
+    """Get cheapest fares from ALL airlines (Ryanair + Wizz Air).
+    Returns combined list sorted by price."""
+    ryanair = ryanair_cheapest_fares(origin, dest, date_from, date_to)
+    for f in ryanair:
+        f.setdefault("airline", "Ryanair")
+    wizz = wizzair_cheapest_fares(origin, dest, date_from, date_to)
+    combined = ryanair + wizz
+    combined.sort(key=lambda x: x.get("price", 99999))
+    return combined
+
+
 def find_multi_city_trips(params):
     """
     Find cheapest multi-segment trips: Origin → Hub(s) → Destination,
@@ -2098,6 +2157,8 @@ def generate_warm_recommendations(results, month, pax):
             "ret_date": r.get("ret_date", ""),
             "out_pp": r.get("out_pp", 0),
             "ret_pp": r.get("ret_pp", 0),
+            "out_airline": r.get("out_airline", "Ryanair"),
+            "ret_airline": r.get("ret_airline", "Ryanair"),
             "ryanair_rt_pp": r.get("ryanair_rt_pp", 0),
             "ryanair_rt_total": r.get("ryanair_rt_total", 0),
             "grand_total": r.get("grand_total", 0),
@@ -2170,12 +2231,12 @@ def warm_search(params):
     cache_lock = threading.Lock()
 
     def fetch_out(origin, hub):
-        fares = ryanair_cheapest_fares(origin, hub, date_out_from, date_out_to)
+        fares = all_cheapest_fares(origin, hub, date_out_from, date_out_to)
         with cache_lock:
             fare_cache_out[(origin, hub)] = fares
 
     def fetch_ret(hub, origin):
-        fares = ryanair_cheapest_fares(hub, origin, date_ret_from, date_ret_to)
+        fares = all_cheapest_fares(hub, origin, date_ret_from, date_ret_to)
         with cache_lock:
             fare_cache_ret[(hub, origin)] = fares
 
@@ -2194,8 +2255,7 @@ def warm_search(params):
 
     log.info(f"Warm search: fetched {len(fare_cache_out)} outbound + {len(fare_cache_ret)} return fare sets for {len(all_hubs)} hubs × {len(origins_to_check)} origins")
 
-    # Step 4: For each warm destination, find cheapest CONFIRMED Ryanair route
-    # Only real Ryanair prices PL↔Hub — NO fake estimates for hub→destination
+    # Step 4: For each warm destination, find cheapest route (Ryanair + Wizz Air)
     results = []
     for wd in warm_dests:
         dest_info = DESTINATION_HUB_MAP.get(wd["keyword"], {})
@@ -2220,22 +2280,25 @@ def warm_search(params):
                 if out_pp >= 99999 or ret_pp >= 99999:
                     continue
 
-                # Only confirmed Ryanair prices — PL↔Hub round trip
-                ryanair_rt_pp = out_pp + ret_pp
-                ryanair_rt_total = round(ryanair_rt_pp * pax, 2)
+                pl_hub_rt_pp = out_pp + ret_pp
+                pl_hub_rt_total = round(pl_hub_rt_pp * pax, 2)
+                out_airline = cheapest_out.get("airline", "Ryanair")
+                ret_airline = cheapest_ret.get("airline", "Ryanair")
 
                 route = {
                     "hub": hub,
                     "origin": origin,
                     "out_pp": out_pp,
                     "ret_pp": ret_pp,
-                    "ryanair_rt_pp": round(ryanair_rt_pp, 2),
-                    "ryanair_rt_total": ryanair_rt_total,
+                    "out_airline": out_airline,
+                    "ret_airline": ret_airline,
+                    "ryanair_rt_pp": round(pl_hub_rt_pp, 2),
+                    "ryanair_rt_total": pl_hub_rt_total,
                     "out_date": cheapest_out.get("date", date_out_from),
                     "ret_date": cheapest_ret.get("date", date_ret_from),
                 }
 
-                if best is None or ryanair_rt_total < best["ryanair_rt_total"]:
+                if best is None or pl_hub_rt_total < best["ryanair_rt_total"]:
                     if best:
                         alternatives.append(best)
                     best = route
@@ -2253,6 +2316,15 @@ def warm_search(params):
         alternatives = alternatives[:3]
 
         primary_dest = dest_airports[0] if dest_airports else ""
+        out_airline = best.get("out_airline", "Ryanair")
+        ret_airline = best.get("ret_airline", "Ryanair")
+
+        # Build booking links per airline
+        def airline_link(airline, origin, dest, date, adults, children):
+            if airline == "Wizz Air":
+                return f"https://wizzair.com/pl-pl/booking/select-flight/search?departureDate={date}&departureAirport={origin}&arrivalAirport={dest}&adults={adults}&children={children}"
+            return f"https://www.ryanair.com/pl/pl/trip/flights/select?adults={adults}&teens=0&children={children}&infants=0&dateOut={date}&originIata={origin}&destinationIata={dest}"
+
         results.append({
             **wd,
             "dest_airports": dest_airports,
@@ -2260,19 +2332,26 @@ def warm_search(params):
             "origin": best["origin"],
             "out_pp": best["out_pp"],
             "ret_pp": best["ret_pp"],
+            "out_airline": out_airline,
+            "ret_airline": ret_airline,
             "ryanair_rt_pp": best["ryanair_rt_pp"],
             "ryanair_rt_total": best["ryanair_rt_total"],
-            "grand_total": best["ryanair_rt_total"],  # for scoring compatibility
+            "grand_total": best["ryanair_rt_total"],
             "out_date": best["out_date"],
             "ret_date": best["ret_date"],
             "pax": pax,
             "alternatives": alternatives,
             "links": {
+                "book_out": airline_link(out_airline, best["origin"], best["hub"], best["out_date"], adults, children),
+                "book_ret": airline_link(ret_airline, best["hub"], best["origin"], best["ret_date"], adults, children),
                 "ryanair_out": f"https://www.ryanair.com/pl/pl/trip/flights/select?adults={adults}&teens=0&children={children}&infants=0&dateOut={best['out_date']}&originIata={best['origin']}&destinationIata={best['hub']}",
                 "ryanair_ret": f"https://www.ryanair.com/pl/pl/trip/flights/select?adults={adults}&teens=0&children={children}&infants=0&dateOut={best['ret_date']}&originIata={best['hub']}&destinationIata={best['origin']}",
                 "google_flights": build_google_flights_url(best["hub"], primary_dest, date_out_from, date_ret_from, adults, children),
                 "google_flights_hub_dest": build_google_flights_url(best["hub"], primary_dest, best["out_date"], best["ret_date"], adults, children),
                 "kiwi_full": f"https://www.kiwi.com/pl/search/tiles/{best['origin'].lower()}/{primary_dest.lower()}/{date_out_from}/{date_ret_from}?adults={adults}&children={children}&sortBy=price",
+                "charter_rainbow": f"https://biletyczarterowe.r.pl/wyszukaj/{wd['keyword']}",
+                "charter_itaka": build_itaka_url(wd["keyword"]),
+                "charter_tui": build_tui_url(wd["keyword"]),
             },
         })
 

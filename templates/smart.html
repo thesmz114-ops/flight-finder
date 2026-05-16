@@ -263,7 +263,7 @@
                             <div style="background:#052e16;border:1px solid #22c55e44;border-radius:10px;padding:12px 16px;flex:1;min-width:180px">
                                 <div style="font-size:11px;color:#22c55e;text-transform:uppercase;margin-bottom:4px">✅ Wylot z Polski</div>
                                 <div style="font-size:16px;font-weight:700;color:#e2e8f0">${p.origin} → ${p.hub}</div>
-                                <div style="font-size:12px;color:#94a3b8">Ryanair · ${p.out_date}</div>
+                                <div style="font-size:12px;color:#94a3b8">${p.out_airline || 'Ryanair'} · ${p.out_date}</div>
                                 <div style="font-size:15px;font-weight:700;color:#22c55e;margin-top:4px">${Math.round(p.out_pp)} PLN/os</div>
                             </div>
                             <div style="font-size:20px;color:${p.color}">✈→</div>
@@ -280,7 +280,7 @@
                             <div style="background:#052e16;border:1px solid #22c55e44;border-radius:10px;padding:12px 16px;flex:1;min-width:180px">
                                 <div style="font-size:11px;color:#22c55e;text-transform:uppercase;margin-bottom:4px">✅ Powrót do Polski</div>
                                 <div style="font-size:16px;font-weight:700;color:#e2e8f0">${p.hub} → ${p.origin}</div>
-                                <div style="font-size:12px;color:#94a3b8">Ryanair · ${p.ret_date}</div>
+                                <div style="font-size:12px;color:#94a3b8">${p.ret_airline || 'Ryanair'} · ${p.ret_date}</div>
                                 <div style="font-size:15px;font-weight:700;color:#22c55e;margin-top:4px">${Math.round(p.ret_pp)} PLN/os</div>
                             </div>
                         </div>
@@ -293,10 +293,12 @@
 
                         <!-- Booking links -->
                         <div style="display:flex;gap:8px;padding:12px 20px;background:#0f1330;border-top:1px solid #1e293b;flex-wrap:wrap">
-                            <a href="${p.links.ryanair_out}" target="_blank" class="route-link primary">Kup Ryanair ${p.origin}→${p.hub}</a>
-                            <a href="${p.links.ryanair_ret}" target="_blank" class="route-link primary">Kup Ryanair ${p.hub}→${p.origin}</a>
+                            <a href="${p.links.book_out || p.links.ryanair_out}" target="_blank" class="route-link primary">Kup ${p.out_airline || 'Ryanair'} ${p.origin}→${p.hub}</a>
+                            <a href="${p.links.book_ret || p.links.ryanair_ret}" target="_blank" class="route-link primary">Kup ${p.ret_airline || 'Ryanair'} ${p.hub}→${p.origin}</a>
                             <a href="${p.links.google_flights}" target="_blank" class="route-link">Google Flights ${p.hub}→${p.dest_airport}</a>
                             <a href="${p.links.kiwi_full}" target="_blank" class="route-link">Kiwi pełna trasa</a>
+                            ${p.links.charter_rainbow ? '<a href="'+p.links.charter_rainbow+'" target="_blank" class="route-link" style="background:#f59e0b22;color:#f59e0b">✈ Czartery Rainbow</a>' : ''}
+                            ${p.links.charter_itaka ? '<a href="'+p.links.charter_itaka+'" target="_blank" class="route-link" style="background:#f59e0b22;color:#f59e0b">Itaka</a>' : ''}
                         </div>
                     </div>`;
                 });
@@ -345,7 +347,7 @@
                             <div style="background:#052e16;border:1px solid #22c55e44;border-radius:10px;padding:12px 16px;flex:1;min-width:140px">
                                 <div style="font-size:11px;color:#22c55e;margin-bottom:4px">✅ WYLOT</div>
                                 <div class="leg-route">${r.origin} → ${r.hub}</div>
-                                <div class="leg-detail">Ryanair · ${r.out_date}</div>
+                                <div class="leg-detail">${r.out_airline || 'Ryanair'} · ${r.out_date}</div>
                                 <div class="leg-price">${Math.round(r.out_pp)} PLN/os</div>
                             </div>
                             <div style="font-size:18px;color:#f59e0b">→</div>
@@ -361,7 +363,7 @@
                             <div style="background:#052e16;border:1px solid #22c55e44;border-radius:10px;padding:12px 16px;flex:1;min-width:140px">
                                 <div style="font-size:11px;color:#22c55e;margin-bottom:4px">✅ POWRÓT</div>
                                 <div class="leg-route">${r.hub} → ${r.origin}</div>
-                                <div class="leg-detail">Ryanair · ${r.ret_date}</div>
+                                <div class="leg-detail">${r.ret_airline || 'Ryanair'} · ${r.ret_date}</div>
                                 <div class="leg-price">${Math.round(r.ret_pp)} PLN/os</div>
                             </div>
                         </div>`;
@@ -375,10 +377,11 @@
                 }
                 html += `</div>
                     <div class="route-links">
-                        <a href="${r.links.ryanair_out}" target="_blank" class="route-link primary">Kup Ryanair ${r.origin}→${r.hub}</a>
-                        <a href="${r.links.ryanair_ret}" target="_blank" class="route-link primary">Kup Ryanair ${r.hub}→${r.origin}</a>
+                        <a href="${r.links.book_out || r.links.ryanair_out}" target="_blank" class="route-link primary">Kup ${r.out_airline || 'Ryanair'} ${r.origin}→${r.hub}</a>
+                        <a href="${r.links.book_ret || r.links.ryanair_ret}" target="_blank" class="route-link primary">Kup ${r.ret_airline || 'Ryanair'} ${r.hub}→${r.origin}</a>
                         <a href="${r.links.google_flights}" target="_blank" class="route-link">Google Flights ${r.hub}→${r.dest_airports[0]}</a>
                         <a href="${r.links.kiwi_full}" target="_blank" class="route-link">Kiwi pełna trasa</a>
+                        ${r.links.charter_rainbow ? '<a href="'+r.links.charter_rainbow+'" target="_blank" class="route-link" style="background:#f59e0b22;color:#f59e0b">✈ Czartery</a>' : ''}
                     </div>
                 </div>`;
             });
