@@ -2362,8 +2362,8 @@ def search_multi():
 
 @app.route("/fetch-price", methods=["POST"])
 def fetch_price():
-    """Fetch real price from Google Flights by scraping the page via Chrome.
-    Called by frontend one route at a time."""
+    """Fetch real price from Kayak by scraping via Playwright.
+    Returns price per person for a round-trip hub↔destination."""
     data = request.json or {}
     hub = data.get("hub", "STN")
     dest = data.get("dest", "BKK")
@@ -2371,19 +2371,35 @@ def fetch_price():
     date_ret = data.get("date_ret", "2026-06-28")
     adults = int(data.get("adults", 2))
     children = int(data.get("children", 2))
-    max_stops = data.get("max_stops")  # None = any, 0 = direct only, 1 = max 1
+    pax = adults + children
 
-    # Build Google Flights URL
     gf_url = build_google_flights_url(hub, dest, date_out, date_ret, adults, children)
 
-    # We return the URL — the frontend will open it in Chrome and read the price
-    # This endpoint just provides the properly formatted URL and params
-    return jsonify({
-        "hub": hub,
-        "dest": dest,
-        "google_flights_url": gf_url,
-        "kiwi_url": f"https://www.kiwi.com/pl/search/tiles/{hub.lower()}/{dest.lower()}/{date_out}/{date_ret}?adults={adults}&children={children}&sortBy=price",
-    })
+    # Try Kayak scraping for real price (1 adult, then multiply)
+    price_1adult, kayak_url = fetch_kayak_price(hub, dest, date_out, date_ret, adults=1)
+
+    if price_1adult:
+        price_pp = price_1adult  # Kayak returns per-person price for 1 adult
+        total = price_pp * pax
+        return jsonify({
+            "hub": hub, "dest": dest,
+            "price_pp": price_pp,
+            "total": total,
+            "pax": pax,
+            "source": "Kayak",
+            "confirmed": True,
+            "kayak_url": kayak_url,
+            "google_flights_url": gf_url,
+        })
+    else:
+        return jsonify({
+            "hub": hub, "dest": dest,
+            "price_pp": None,
+            "confirmed": False,
+            "error": "Nie udało się pobrać ceny",
+            "google_flights_url": gf_url,
+            "kayak_url": kayak_url,
+        })
 
 
 @app.route("/export-csv", methods=["POST"])

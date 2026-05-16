@@ -249,10 +249,12 @@
                                     <div style="font-size:13px;color:#94a3b8;margin-top:2px">🌡 ${p.temp}°C${p.water_temp ? ' · 🌊 woda ' + p.water_temp + '°C' : ''}</div>
                                 </div>
                             </div>
-                            <div style="text-align:right">
-                                <div style="font-size:24px;font-weight:800;color:#22c55e">${Math.round(ryanairTotal)} PLN</div>
-                                <div style="font-size:11px;color:#22c55e;font-weight:600">✅ Potwierdzona cena Ryanair PL↔Hub</div>
-                                <div style="font-size:11px;color:#94a3b8">${Math.round(ryanairPP)} PLN/os × ${p.pax} os.</div>
+                            <div style="text-align:right" id="total-rec-${p.rank}">
+                                <div style="font-size:14px;font-weight:600;color:#22c55e">Ryanair PL↔Hub: ${Math.round(ryanairTotal)} PLN ✅</div>
+                                <div style="font-size:12px;color:#f59e0b;margin-top:2px">
+                                    <span style="display:inline-block;width:10px;height:10px;border:2px solid #334155;border-top:2px solid #f59e0b;border-radius:50%;animation:spin 1s linear infinite;vertical-align:middle"></span>
+                                    Pobieram cenę Hub↔Dest...
+                                </div>
                             </div>
                         </div>
 
@@ -265,11 +267,14 @@
                                 <div style="font-size:15px;font-weight:700;color:#22c55e;margin-top:4px">${Math.round(p.out_pp)} PLN/os</div>
                             </div>
                             <div style="font-size:20px;color:${p.color}">✈→</div>
-                            <div style="background:#1e293b;border:1px dashed #f59e0b44;border-radius:10px;padding:12px 16px;flex:1;min-width:180px">
-                                <div style="font-size:11px;color:#f59e0b;text-transform:uppercase;margin-bottom:4px">🔍 Hub ↔ Destynacja (RT)</div>
+                            <div id="hub-dest-rec-${p.rank}" style="background:#1e293b;border:1px dashed #f59e0b44;border-radius:10px;padding:12px 16px;flex:1;min-width:180px">
+                                <div style="font-size:11px;color:#f59e0b;text-transform:uppercase;margin-bottom:4px">✈ Hub ↔ Destynacja (RT)</div>
                                 <div style="font-size:16px;font-weight:700;color:#e2e8f0">${p.hub} ↔ ${p.dest_airport}</div>
                                 <div style="font-size:12px;color:#94a3b8">Różne linie · w obie strony</div>
-                                <a href="${p.links.google_flights_hub_dest || p.links.google_flights}" target="_blank" style="display:inline-block;margin-top:6px;padding:4px 12px;background:#f59e0b;color:#0a0e27;border-radius:6px;font-size:12px;font-weight:700;text-decoration:none">Sprawdź cenę →</a>
+                                <div class="hub-dest-price" style="margin-top:6px">
+                                    <div class="spinner-small" style="display:inline-block;width:14px;height:14px;border:2px solid #334155;border-top:2px solid #f59e0b;border-radius:50%;animation:spin 1s linear infinite;vertical-align:middle"></div>
+                                    <span style="font-size:12px;color:#f59e0b;margin-left:6px">Pobieram cenę z Kayak...</span>
+                                </div>
                             </div>
                             <div style="font-size:20px;color:${p.color}">✈→</div>
                             <div style="background:#052e16;border:1px solid #22c55e44;border-radius:10px;padding:12px 16px;flex:1;min-width:180px">
@@ -319,9 +324,12 @@
                                 <div class="route-hub-sub">${r.temp}°C${r.water_temp ? ' · woda ' + r.water_temp + '°C' : ''} · ${r.dest_airports.join(', ')}</div>
                             </div>
                         </div>
-                        <div class="route-price">
-                            <div class="europe" style="color:#22c55e">${Math.round(ryanairTotal)} PLN</div>
-                            <div class="pp" style="color:#22c55e">✅ Ryanair PL↔${r.hub} · ${Math.round(ryanairPP)} PLN/os × ${pax} os.</div>
+                        <div class="route-price" id="total-card-${i}">
+                            <div style="font-size:13px;color:#22c55e">Ryanair PL↔${r.hub}: ${Math.round(ryanairTotal)} PLN ✅</div>
+                            <div style="font-size:11px;color:#f59e0b;margin-top:2px">
+                                <span style="display:inline-block;width:10px;height:10px;border:2px solid #334155;border-top:2px solid #f59e0b;border-radius:50%;animation:spin 1s linear infinite;vertical-align:middle"></span>
+                                Pobieram Hub↔Dest...
+                            </div>
                         </div>
                     </div>
                     <div class="route-body">
@@ -333,10 +341,13 @@
                                 <div class="leg-price">${Math.round(r.out_pp)} PLN/os</div>
                             </div>
                             <div style="font-size:18px;color:#f59e0b">→</div>
-                            <div style="background:#1e293b;border:1px dashed #f59e0b44;border-radius:10px;padding:12px 16px;flex:1;min-width:140px;text-align:center">
-                                <div style="font-size:11px;color:#f59e0b;margin-bottom:4px">🔍 HUB ↔ DESTYNACJA</div>
+                            <div id="hub-dest-${i}" style="background:#1e293b;border:1px dashed #f59e0b44;border-radius:10px;padding:12px 16px;flex:1;min-width:140px;text-align:center">
+                                <div style="font-size:11px;color:#f59e0b;margin-bottom:4px">✈ HUB ↔ DESTYNACJA</div>
                                 <div class="leg-route">${r.hub} ↔ ${r.dest_airports[0]}</div>
-                                <a href="${r.links.google_flights_hub_dest || r.links.google_flights}" target="_blank" style="display:inline-block;margin-top:6px;padding:4px 12px;background:#f59e0b;color:#0a0e27;border-radius:6px;font-size:12px;font-weight:700;text-decoration:none">Sprawdź cenę →</a>
+                                <div class="hub-dest-price" style="margin-top:6px">
+                                    <div style="display:inline-block;width:12px;height:12px;border:2px solid #334155;border-top:2px solid #f59e0b;border-radius:50%;animation:spin 1s linear infinite;vertical-align:middle"></div>
+                                    <span style="font-size:11px;color:#f59e0b;margin-left:4px">Pobieram...</span>
+                                </div>
                             </div>
                             <div style="font-size:18px;color:#f59e0b">→</div>
                             <div style="background:#052e16;border:1px solid #22c55e44;border-radius:10px;padding:12px 16px;flex:1;min-width:140px">
@@ -365,6 +376,141 @@
             });
 
             div.innerHTML = html;
+
+            // Auto-fetch hub↔dest prices from Kayak (progressive loading)
+            fetchHubDestPrices(recommendations || [], results, pax);
+        }
+
+        async function fetchHubDestPrices(recs, results, pax) {
+            // Collect all unique hub-dest pairs to fetch
+            const toFetch = [];
+
+            // From recommendations (top 3)
+            recs.forEach((p, i) => {
+                toFetch.push({
+                    hub: p.hub, dest: p.dest_airport, origin: p.origin,
+                    out_date: p.out_date, ret_date: p.ret_date,
+                    ryanairTotal: p.ryanair_rt_total || p.grand_total,
+                    ryanairPP: p.ryanair_rt_pp || (p.out_pp + p.ret_pp),
+                    recIdx: p.rank, cardIdx: null, pax: pax,
+                });
+            });
+
+            // From all results
+            results.forEach((r, i) => {
+                toFetch.push({
+                    hub: r.hub, dest: r.dest_airports[0], origin: r.origin,
+                    out_date: r.out_date, ret_date: r.ret_date,
+                    ryanairTotal: r.ryanair_rt_total || r.grand_total,
+                    ryanairPP: r.ryanair_rt_pp || (r.out_pp + r.ret_pp),
+                    recIdx: null, cardIdx: i, pax: pax,
+                });
+            });
+
+            // Deduplicate by hub+dest (same pair may appear in rec + list)
+            const seen = {};
+            const unique = [];
+            toFetch.forEach(f => {
+                const key = `${f.hub}-${f.dest}`;
+                if (!seen[key]) {
+                    seen[key] = [];
+                    unique.push(f);
+                }
+                seen[key].push(f);
+            });
+
+            // Fetch in parallel (max 3 concurrent to avoid overload)
+            const queue = [...unique];
+            const workers = Math.min(3, queue.length);
+
+            async function worker() {
+                while (queue.length > 0) {
+                    const item = queue.shift();
+                    if (!item) break;
+                    const key = `${item.hub}-${item.dest}`;
+                    try {
+                        const resp = await fetch('/fetch-price', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({
+                                hub: item.hub, dest: item.dest,
+                                date_out: item.out_date, date_ret: item.ret_date,
+                                adults: Math.ceil(item.pax / 2), children: Math.floor(item.pax / 2),
+                            }),
+                        });
+                        const data = await resp.json();
+
+                        // Update all elements with this hub-dest pair
+                        const targets = seen[key] || [];
+                        targets.forEach(t => {
+                            if (data.confirmed && data.price_pp) {
+                                const hubDestTotal = data.price_pp * t.pax;
+                                const fullTotal = t.ryanairTotal + hubDestTotal;
+                                const fullPP = t.ryanairPP + data.price_pp;
+                                updatePriceCard(t, data.price_pp, hubDestTotal, fullTotal, fullPP, data.source);
+                            } else {
+                                updatePriceCardError(t, data.google_flights_url);
+                            }
+                        });
+                    } catch (err) {
+                        console.error(`Price fetch error ${item.hub}→${item.dest}:`, err);
+                        const targets = seen[key] || [];
+                        targets.forEach(t => updatePriceCardError(t, ''));
+                    }
+                }
+            }
+
+            const promises = [];
+            for (let i = 0; i < workers; i++) promises.push(worker());
+            await Promise.all(promises);
+        }
+
+        function updatePriceCard(t, pricePP, hubDestTotal, fullTotal, fullPP, source) {
+            // Update hub-dest price box
+            const hubDestEl = t.recIdx ? document.getElementById(`hub-dest-rec-${t.recIdx}`)
+                                       : document.getElementById(`hub-dest-${t.cardIdx}`);
+            if (hubDestEl) {
+                const priceDiv = hubDestEl.querySelector('.hub-dest-price');
+                if (priceDiv) {
+                    priceDiv.innerHTML = `<div style="font-size:15px;font-weight:700;color:#22c55e">${Math.round(pricePP)} PLN/os ✅</div>
+                        <div style="font-size:10px;color:#64748b">${source} · potwierdzona</div>`;
+                    hubDestEl.style.borderColor = '#22c55e44';
+                    hubDestEl.style.borderStyle = 'solid';
+                    hubDestEl.style.background = '#052e16';
+                }
+            }
+
+            // Update total price header
+            const totalEl = t.recIdx ? document.getElementById(`total-rec-${t.recIdx}`)
+                                     : document.getElementById(`total-card-${t.cardIdx}`);
+            if (totalEl) {
+                const color = fullTotal <= 6000 ? '#22c55e' : fullTotal <= 12000 ? '#f59e0b' : '#f97316';
+                totalEl.innerHTML = `<div style="font-size:${t.recIdx ? 28 : 20}px;font-weight:800;color:${color}">${Math.round(fullTotal)} PLN</div>
+                    <div style="font-size:11px;color:#22c55e;font-weight:600">✅ Cała podróż potwierdzona</div>
+                    <div style="font-size:11px;color:#94a3b8">${Math.round(fullPP)} PLN/os × ${t.pax} os.</div>`;
+            }
+        }
+
+        function updatePriceCardError(t, gfUrl) {
+            const hubDestEl = t.recIdx ? document.getElementById(`hub-dest-rec-${t.recIdx}`)
+                                       : document.getElementById(`hub-dest-${t.cardIdx}`);
+            if (hubDestEl) {
+                const priceDiv = hubDestEl.querySelector('.hub-dest-price');
+                if (priceDiv) {
+                    priceDiv.innerHTML = gfUrl
+                        ? `<a href="${gfUrl}" target="_blank" style="display:inline-block;padding:4px 12px;background:#f59e0b;color:#0a0e27;border-radius:6px;font-size:12px;font-weight:700;text-decoration:none">Sprawdź ręcznie →</a>`
+                        : `<span style="font-size:11px;color:#ef4444">Nie udało się pobrać ceny</span>`;
+                }
+            }
+
+            const totalEl = t.recIdx ? document.getElementById(`total-rec-${t.recIdx}`)
+                                     : document.getElementById(`total-card-${t.cardIdx}`);
+            if (totalEl) {
+                const ryanairTotal = t.ryanairTotal;
+                totalEl.innerHTML = `<div style="font-size:${t.recIdx ? 20 : 16}px;font-weight:700;color:#22c55e">${Math.round(ryanairTotal)} PLN ✅</div>
+                    <div style="font-size:11px;color:#94a3b8">Ryanair PL↔Hub</div>
+                    <div style="font-size:11px;color:#f59e0b">+ Hub↔Dest: sprawdź w linku</div>`;
+            }
         }
 
         async function doSearch(e) {
