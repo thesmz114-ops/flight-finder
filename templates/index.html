@@ -342,6 +342,10 @@
                 </select>
             </div>
             <div class="form-group">
+                <label>Max cena za 1 stronę (PLN/os)</label>
+                <input type="number" id="max_price_oneway" placeholder="np. 500">
+            </div>
+            <div class="form-group">
                 <label>Max cena łączna (PLN)</label>
                 <input type="number" id="max_price" placeholder="np. 4000" value="4000">
             </div>
@@ -393,6 +397,7 @@
                 date_ret_from: document.getElementById('date_ret_from').value,
                 date_ret_to: document.getElementById('date_ret_to').value,
                 max_stops: document.getElementById('max_stops').value,
+                max_price_oneway: document.getElementById('max_price_oneway').value,
                 max_price: document.getElementById('max_price').value,
             };
 
@@ -416,7 +421,7 @@
         let sortCol = 'total_price_pln';
         let sortDir = 'asc';
 
-        const ALL_SOURCES = ['Ryanair', 'Ryanair RT', 'Wizz Air', 'AZair', 'SecretFlying', 'Rainbow Tours'];
+        const ALL_SOURCES = ['Ryanair', 'Ryanair RT', 'Wizz Air', 'Mix RT', 'AZair', 'SecretFlying', 'Rainbow Tours'];
 
         function priceClass(total) {
             if (total <= 0) return '';
@@ -428,7 +433,7 @@
         function badgeClass(source) {
             if (source === 'SecretFlying') return 'badge-error-fare';
             if (source === 'Rainbow Tours') return 'badge-charter';
-            if (source === 'Ryanair RT') return 'badge-roundtrip';
+            if (source === 'Ryanair RT' || source === 'Mix RT' || source === 'Wizz Air RT') return 'badge-roundtrip';
             if (source === 'AZair') return 'badge-azair';
             return 'badge-source';
         }
@@ -484,7 +489,7 @@
             // Summary cards
             const apiResults = results.filter(r => r.total_price_pln > 0);
             const directResults = apiResults.filter(r => r.direct === true);
-            const roundtrips = apiResults.filter(r => r.source === 'Ryanair RT');
+            const roundtrips = apiResults.filter(r => r.direction === 'roundtrip');
             const cheapest = apiResults[0];
             const cheapestDirect = directResults[0];
             const cheapestRT = roundtrips[0];
@@ -504,7 +509,7 @@
             }
             if (cheapestRT) {
                 html += `<div class="summary-card">
-                    <h4>Najtańszy Ryanair w obie strony</h4>
+                    <h4>Najtańszy w obie strony</h4>
                     <div class="value ${priceClass(cheapestRT.total_price_pln)}">${cheapestRT.total_price_pln} PLN</div>
                     <div class="detail">${cheapestRT.origin}→${cheapestRT.destination} · ${cheapestRT.date}</div>
                 </div>`;

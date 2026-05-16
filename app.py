@@ -664,42 +664,57 @@ def build_tui_url(destination_keyword="fuerteventura"):
 # ---------------------------------------------------------------------------
 # HELPER: Combine Ryanair outbound + return into round-trip pairs
 # ---------------------------------------------------------------------------
-def combine_ryanair_roundtrips(all_results, adults, children):
-    """Find cheapest outbound+return combos for each origin from Ryanair."""
+def combine_roundtrips(all_results, adults, children, max_price_oneway=None):
+    """Combine all outbound+return one-way fares into round-trip pairs."""
     pax = adults + children
     outbound = {}  # origin -> list of fares
     returns = {}   # destination (=origin) -> list of fares
 
     for r in all_results:
-        if r.get("source") != "Ryanair":
-            continue
         if r.get("direction") == "outbound":
+            if max_price_oneway and r.get("price_per_person", 0) > max_price_oneway:
+                continue
             outbound.setdefault(r["origin"], []).append(r)
         elif r.get("direction") == "return":
+            if max_price_oneway and r.get("price_per_person", 0) > max_price_oneway:
+                continue
             returns.setdefault(r["destination"], []).append(r)
 
     combos = []
+    seen = set()
     for origin, out_fares in outbound.items():
         ret_fares = returns.get(origin, [])
         if not ret_fares:
             continue
-        # Find cheapest return for this origin
-        cheapest_ret = min(ret_fares, key=lambda x: x["price_per_person"])
         for out in out_fares:
-            roundtrip_pp = out["price_per_person"] + cheapest_ret["price_per_person"]
-            combos.append({
-                "source": "Ryanair RT",
-                "airline": "Ryanair",
-                "origin": origin,
-                "destination": out["destination"],
-                "date": f"{out['date']} → {cheapest_ret['date']}",
-                "price_per_person": round(roundtrip_pp, 2),
-                "currency": "PLN",
-                "direct": out["direct"] and cheapest_ret["direct"],
-                "direction": "roundtrip",
-                "link": out["link"],
-                "notes": f"W obie strony, bez bagażu. Powrót {cheapest_ret['date']} ({cheapest_ret['price_per_person']} PLN/os)",
-            })
+            for ret in ret_fares:
+                key = (origin, out["date"], ret["date"], out.get("source"), ret.get("source"))
+                if key in seen:
+                    continue
+                seen.add(key)
+                roundtrip_pp = out["price_per_person"] + ret["price_per_person"]
+                out_airline = out.get("airline", out.get("source", ""))
+                ret_airline = ret.get("airline", ret.get("source", ""))
+                if out_airline == ret_airline:
+                    airline_label = out_airline
+                    source_label = f"{out_airline} RT"
+                else:
+                    airline_label = f"{out_airline} + {ret_airline}"
+                    source_label = "Mix RT"
+                combos.append({
+                    "source": source_label,
+                    "airline": airline_label,
+                    "origin": origin,
+                    "destination": out["destination"],
+                    "date": f"{out['date']} → {ret['date']}",
+                    "price_per_person": round(roundtrip_pp, 2),
+                    "currency": "PLN",
+                    "direct": out.get("direct", False) and ret.get("direct", False),
+                    "direction": "roundtrip",
+                    "link": out.get("link", ""),
+                    "notes": f"W obie strony. Wylot {out['price_per_person']} PLN/os ({out_airline}), powrót {ret['price_per_person']} PLN/os ({ret_airline})",
+                })
+    combos.sort(key=lambda x: x["price_per_person"])
     return combos
 
 
@@ -717,6 +732,7 @@ def search_all(params):
     adults = params.get("adults", 2)
     children = params.get("children", 2)
     max_stops = params.get("max_stops")
+    max_price_oneway = params.get("max_price_oneway")
     max_price = params.get("max_price")
     dest_keyword = params.get("dest_keyword", "fuerteventura")
 
@@ -801,12 +817,11 @@ def search_all(params):
     for t in threads:
         t.join(timeout=25)
 
-    # Combine Ryanair outbound + return into round-trip combos
-    roundtrips = combine_ryanair_roundtrips(all_results, adults, children)
+    # Combine all outbound + return one-way fares into round-trip pairs
+    roundtrips = combine_roundtrips(all_results, adults, children, max_price_oneway)
     all_results.extend(roundtrips)
 
     # Remove individual one-way legs when user specified return dates
-    # (round-trip search should only show complete RT combos, not separate legs)
     if date_ret_from:
         all_results = [r for r in all_results if r.get("direction") not in ("outbound", "return")]
 
@@ -878,6 +893,7 @@ def search():
         "adults": int(data.get("adults", 2)),
         "children": int(data.get("children", 2)),
         "max_stops": int(data.get("max_stops")) if data.get("max_stops") not in (None, "", "any") else None,
+        "max_price_oneway": int(data.get("max_price_oneway")) if data.get("max_price_oneway") else None,
         "max_price": int(data.get("max_price")) if data.get("max_price") else None,
     }
     result = search_all(params)
