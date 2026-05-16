@@ -1717,6 +1717,108 @@ def all_cheapest_fares(origin, dest, date_from, date_to):
     return combined
 
 
+def search_charter_rainbow(date_from, date_to, adults=2, children=2):
+    """Search biletyczarterowe.r.pl API for charter flights from Poland.
+    Returns list of {dest_iata, dest_name, country, price_pp, date, airline, url}."""
+    results = []
+    # Build passenger birth dates (adults born 1990, children born 2018)
+    birth_dates = ["1990-01-01"] * adults + ["2018-01-01"] * children
+    params_arr = "&".join(f"dataUrodzenia%5B%5D={d}" for d in birth_dates)
+    url = (
+        f"https://biletyczarterowe.r.pl/api/v4.0/wyszukiwanie/wyszukaj"
+        f"?iataSkad=WAW&{params_arr}&dataMin={date_from}&dataMax={date_to}&oneWay=false"
+    )
+    try:
+        r = requests.get(url, headers={**HEADERS, "Referer": "https://biletyczarterowe.r.pl/"}, timeout=15)
+        if r.status_code == 200:
+            data = r.json()
+            for d in data.get("Destynacje", []):
+                price = d.get("Cena", 0)
+                if price and price > 0:
+                    dl = d.get("DataLayer", {})
+                    results.append({
+                        "dest_iata": d.get("Klucz", ""),
+                        "dest_name": d.get("Nazwa", ""),
+                        "country": d.get("Panstwo", ""),
+                        "price_pp": price,
+                        "date": d.get("TerminWyjazdu", "")[:10],
+                        "airline": dl.get("brand", "Charter"),
+                        "baggage_kg": d.get("Bagaz", 0),
+                        "source": "Rainbow Charter",
+                        "url": f"https://biletyczarterowe.r.pl/wyszukaj?skad=WAW&dokad={d.get('Klucz','')}&dataMin={date_from}&dataMax={date_to}",
+                    })
+        else:
+            log.warning(f"Rainbow charter API: HTTP {r.status_code}")
+    except Exception as e:
+        log.error(f"Rainbow charter API error: {e}")
+
+    # Also search from other Polish airports
+    for origin in ["KTW", "KRK", "GDN", "WRO", "POZ"]:
+        try:
+            url2 = (
+                f"https://biletyczarterowe.r.pl/api/v4.0/wyszukiwanie/wyszukaj"
+                f"?iataSkad={origin}&{params_arr}&dataMin={date_from}&dataMax={date_to}&oneWay=false"
+            )
+            r2 = requests.get(url2, headers={**HEADERS, "Referer": "https://biletyczarterowe.r.pl/"}, timeout=10)
+            if r2.status_code == 200:
+                data2 = r2.json()
+                for d in data2.get("Destynacje", []):
+                    price = d.get("Cena", 0)
+                    if price and price > 0:
+                        dl = d.get("DataLayer", {})
+                        results.append({
+                            "dest_iata": d.get("Klucz", ""),
+                            "dest_name": d.get("Nazwa", ""),
+                            "country": d.get("Panstwo", ""),
+                            "origin": origin,
+                            "price_pp": price,
+                            "date": d.get("TerminWyjazdu", "")[:10],
+                            "airline": dl.get("brand", "Charter"),
+                            "baggage_kg": d.get("Bagaz", 0),
+                            "source": "Rainbow Charter",
+                            "url": f"https://biletyczarterowe.r.pl/wyszukaj?skad={origin}&dokad={d.get('Klucz','')}&dataMin={date_from}&dataMax={date_to}",
+                        })
+        except Exception:
+            pass
+
+    results.sort(key=lambda x: x["price_pp"])
+    return results
+
+
+# Mapping: WARM_DESTINATIONS keyword -> charter IATA codes
+CHARTER_DEST_MAP = {
+    "egipt": ["HRG", "SSH", "RMF"],
+    "antalya": ["AYT"],
+    "turcja": ["AYT", "DLM", "BJV"],
+    "tunezja": ["TBJ", "NBE", "MIR"],
+    "maroko": ["AGA", "RAK", "NDR"],
+    "kreta": ["HER", "CHQ"],
+    "rodos": ["RHO"],
+    "korfu": ["CFU"],
+    "majorka": ["PMI"],
+    "sycylia": ["CTA"],
+    "split": ["SPU"],
+    "fuerteventura": ["FUE"],
+    "teneryfa": ["TFS"],
+    "gran canaria": ["LPA"],
+    "lanzarote": ["ACE"],
+    "malaga": ["AGP"],
+    "algarve": ["FAO"],
+    "dubaj": ["DXB"],
+    "zanzibar": ["ZNZ"],
+    "cancun": ["CUN"],
+    "sri lanka": ["CMB"],
+    "malediwy": ["MLE"],
+    "tajlandia": ["BKK", "HKT"],
+    "bali": ["DPS"],
+    "wietnam": ["SGN", "HAN"],
+    "filipiny": ["MNL", "CEB"],
+    "kenia": ["MBA", "NBO"],
+    "mauritius": ["MRU"],
+    "seszele": ["SEZ"],
+}
+
+
 def find_multi_city_trips(params):
     """
     Find cheapest multi-segment trips: Origin → Hub(s) → Destination,
@@ -2255,7 +2357,22 @@ def warm_search(params):
 
     log.info(f"Warm search: fetched {len(fare_cache_out)} outbound + {len(fare_cache_ret)} return fare sets for {len(all_hubs)} hubs × {len(origins_to_check)} origins")
 
-    # Step 4: For each warm destination, find cheapest route (Ryanair + Wizz Air)
+    # Step 3b: Fetch charter flights from Rainbow API (fast HTTP, no scraping)
+    charter_flights = []
+    try:
+        charter_flights = search_charter_rainbow(date_out_from, date_out_to, adults, children)
+        log.info(f"Warm search: found {len(charter_flights)} charter flights from Rainbow")
+    except Exception as e:
+        log.error(f"Charter search error: {e}")
+
+    # Build charter lookup: dest_iata -> cheapest charter
+    charter_by_dest = {}
+    for cf in charter_flights:
+        iata = cf["dest_iata"]
+        if iata not in charter_by_dest or cf["price_pp"] < charter_by_dest[iata]["price_pp"]:
+            charter_by_dest[iata] = cf
+
+    # Step 4: For each warm destination, find cheapest route (Ryanair + Wizz Air + charters)
     results = []
     for wd in warm_dests:
         dest_info = DESTINATION_HUB_MAP.get(wd["keyword"], {})
@@ -2305,11 +2422,37 @@ def warm_search(params):
                 else:
                     alternatives.append(route)
 
-        if best is None:
+        # Check for charter flights to this destination
+        charter_iatas = CHARTER_DEST_MAP.get(wd["keyword"], [])
+        charter_offer = None
+        for ciata in charter_iatas:
+            if ciata in charter_by_dest:
+                cf = charter_by_dest[ciata]
+                charter_pp = cf["price_pp"]
+                charter_total = charter_pp * pax
+                if charter_offer is None or charter_total < charter_offer["total"]:
+                    charter_offer = {
+                        "price_pp": charter_pp,
+                        "total": charter_total,
+                        "date": cf["date"],
+                        "airline": cf["airline"],
+                        "origin": cf.get("origin", "WAW"),
+                        "dest_iata": ciata,
+                        "baggage_kg": cf.get("baggage_kg", 0),
+                        "url": cf["url"],
+                        "source": "Rainbow Charter",
+                    }
+
+        if best is None and charter_offer is None:
             continue
 
-        if max_budget and best["ryanair_rt_total"] > max_budget:
-            continue
+        if max_budget:
+            if best and best["ryanair_rt_total"] > max_budget:
+                best = None
+            if charter_offer and charter_offer["total"] > max_budget:
+                charter_offer = None
+            if best is None and charter_offer is None:
+                continue
 
         # Sort alternatives by confirmed price, keep top 3
         alternatives.sort(key=lambda x: x["ryanair_rt_total"])
@@ -2325,18 +2468,36 @@ def warm_search(params):
                 return f"https://wizzair.com/pl-pl/booking/select-flight/search?departureDate={date}&departureAirport={origin}&arrivalAirport={dest}&adults={adults}&children={children}"
             return f"https://www.ryanair.com/pl/pl/trip/flights/select?adults={adults}&teens=0&children={children}&infants=0&dateOut={date}&originIata={origin}&destinationIata={dest}"
 
+        # Use charter if cheaper than hub route (or if hub route not found)
+        use_charter = False
+        if charter_offer:
+            if best is None or charter_offer["total"] < best["ryanair_rt_total"]:
+                use_charter = True
+
+        if best is None and not use_charter:
+            continue
+
+        # Set effective price for sorting
+        if use_charter:
+            effective_total = charter_offer["total"]
+            effective_pp = charter_offer["price_pp"]
+        else:
+            effective_total = best["ryanair_rt_total"]
+            effective_pp = best["ryanair_rt_pp"]
+
         results.append({
             **wd,
             "dest_airports": dest_airports,
-            "hub": best["hub"],
-            "origin": best["origin"],
-            "out_pp": best["out_pp"],
-            "ret_pp": best["ret_pp"],
-            "out_airline": out_airline,
-            "ret_airline": ret_airline,
-            "ryanair_rt_pp": best["ryanair_rt_pp"],
-            "ryanair_rt_total": best["ryanair_rt_total"],
-            "grand_total": best["ryanair_rt_total"],
+            "hub": best["hub"] if best else "",
+            "origin": best["origin"] if best else (charter_offer["origin"] if charter_offer else "WAW"),
+            "out_pp": best["out_pp"] if best else 0,
+            "ret_pp": best["ret_pp"] if best else 0,
+            "out_airline": out_airline if best else "",
+            "ret_airline": ret_airline if best else "",
+            "ryanair_rt_pp": best["ryanair_rt_pp"] if best else 0,
+            "ryanair_rt_total": best["ryanair_rt_total"] if best else 0,
+            "grand_total": effective_total,
+            "charter": charter_offer,
             "out_date": best["out_date"],
             "ret_date": best["ret_date"],
             "pax": pax,

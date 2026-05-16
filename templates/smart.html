@@ -322,8 +322,29 @@
 
             // Result cards
             results.forEach((r, i) => {
-                const ryanairTotal = r.ryanair_rt_total || r.grand_total;
+                const ryanairTotal = r.ryanair_rt_total || 0;
                 const ryanairPP = r.ryanair_rt_pp || (r.out_pp + r.ret_pp);
+                const ch = r.charter;
+
+                // Charter banner if available
+                let charterHtml = '';
+                if (ch) {
+                    const chColor = (!ryanairTotal || ch.total < ryanairTotal) ? '#22c55e' : '#f59e0b';
+                    const isCheaper = (!ryanairTotal || ch.total < ryanairTotal);
+                    charterHtml = `<div style="background:linear-gradient(135deg,#052e16,#0f1330);border:2px solid ${chColor}44;border-radius:10px;padding:14px 20px;margin:12px 20px 0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+                        <div>
+                            <div style="font-size:12px;font-weight:700;color:${chColor}">✈ CZARTER BEZPOŚREDNI${isCheaper ? ' — TANIEJ!' : ''}</div>
+                            <div style="font-size:15px;font-weight:700;color:#e2e8f0">${ch.origin || 'WAW'} → ${ch.dest_iata} · ${ch.airline}</div>
+                            <div style="font-size:12px;color:#94a3b8">${ch.date}${ch.baggage_kg ? ' · bagaż ' + ch.baggage_kg + 'kg' : ''} · w obie strony</div>
+                        </div>
+                        <div style="text-align:right">
+                            <div style="font-size:22px;font-weight:800;color:${chColor}">${ch.total} PLN ✅</div>
+                            <div style="font-size:11px;color:#94a3b8">${ch.price_pp} PLN/os × ${r.pax || pax} os.</div>
+                        </div>
+                        <a href="${ch.url}" target="_blank" style="padding:6px 16px;background:${chColor};color:#0a0e27;border-radius:8px;font-size:13px;font-weight:700;text-decoration:none">Rezerwuj czarter →</a>
+                    </div>`;
+                }
+
                 html += `<div class="route-card">
                     <div class="route-header">
                         <div style="display:flex;align-items:center;gap:16px">
@@ -335,15 +356,20 @@
                             </div>
                         </div>
                         <div class="route-price" id="total-card-${i}">
-                            <div style="font-size:13px;color:#22c55e">Ryanair PL↔${r.hub}: ${Math.round(ryanairTotal)} PLN ✅</div>
-                            <div style="font-size:11px;color:#f59e0b;margin-top:2px">
-                                <span style="display:inline-block;width:10px;height:10px;border:2px solid #334155;border-top:2px solid #f59e0b;border-radius:50%;animation:spin 1s linear infinite;vertical-align:middle"></span>
-                                Pobieram Hub↔Dest...
-                            </div>
+                            ${ch && (!ryanairTotal || ch.total < ryanairTotal) ?
+                                `<div style="font-size:20px;font-weight:800;color:#22c55e">${ch.total} PLN ✅</div>
+                                 <div style="font-size:11px;color:#22c55e">Czarter ${ch.airline}</div>` :
+                                `<div style="font-size:13px;color:#22c55e">${r.out_airline||'Ryanair'}+${r.ret_airline||'Ryanair'} PL↔${r.hub}: ${Math.round(ryanairTotal)} PLN ✅</div>
+                                 <div style="font-size:11px;color:#f59e0b;margin-top:2px">
+                                    <span style="display:inline-block;width:10px;height:10px;border:2px solid #334155;border-top:2px solid #f59e0b;border-radius:50%;animation:spin 1s linear infinite;vertical-align:middle"></span>
+                                    + Hub↔Dest...
+                                 </div>`}
+                            ${ch && ryanairTotal && ch.total >= ryanairTotal ? `<div style="font-size:10px;color:#94a3b8;margin-top:2px">Czarter: ${ch.total} PLN</div>` : ''}
                         </div>
                     </div>
+                    ${charterHtml}
                     <div class="route-body">
-                        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+                        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center${ryanairTotal ? '' : ';display:none'}">
                             <div style="background:#052e16;border:1px solid #22c55e44;border-radius:10px;padding:12px 16px;flex:1;min-width:140px">
                                 <div style="font-size:11px;color:#22c55e;margin-bottom:4px">✅ WYLOT</div>
                                 <div class="leg-route">${r.origin} → ${r.hub}</div>
