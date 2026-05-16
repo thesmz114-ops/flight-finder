@@ -2071,10 +2071,10 @@ def generate_warm_recommendations(results, month, pax):
         why_parts.append(f"{r['temp']}°C powietrze" + (f", {r['water_temp']}°C woda" if r.get("water_temp") else ""))
         if traits.get("family", 0) >= 8 and traits.get("safety", 0) >= 8:
             why_parts.append("świetne z dziećmi")
-        if r.get("grand_total", 0) <= 5000:
-            why_parts.append("budżetowa opcja")
-        elif r.get("grand_total", 0) <= 8000:
-            why_parts.append("dobra cena za egzotykę")
+        if r.get("ryanair_rt_total", r.get("grand_total", 0)) <= 2000:
+            why_parts.append("tanie loty do huba")
+        elif r.get("ryanair_rt_total", r.get("grand_total", 0)) <= 4000:
+            why_parts.append("przystępne loty do huba")
 
         why = ". ".join(why_parts) + "."
         if tip:
@@ -2098,8 +2098,8 @@ def generate_warm_recommendations(results, month, pax):
             "ret_date": r.get("ret_date", ""),
             "out_pp": r.get("out_pp", 0),
             "ret_pp": r.get("ret_pp", 0),
-            "est_hub_dest_pp": r.get("est_hub_dest_pp", 0),
-            "total_pp": r.get("total_pp", 0),
+            "ryanair_rt_pp": r.get("ryanair_rt_pp", 0),
+            "ryanair_rt_total": r.get("ryanair_rt_total", 0),
             "grand_total": r.get("grand_total", 0),
             "pax": pax,
             "highlights": highlights,
@@ -2194,20 +2194,18 @@ def warm_search(params):
 
     log.info(f"Warm search: fetched {len(fare_cache_out)} outbound + {len(fare_cache_ret)} return fare sets for {len(all_hubs)} hubs × {len(origins_to_check)} origins")
 
-    # Step 4: For each warm destination, find cheapest route
+    # Step 4: For each warm destination, find cheapest CONFIRMED Ryanair route
+    # Only real Ryanair prices PL↔Hub — NO fake estimates for hub→destination
     results = []
     for wd in warm_dests:
         dest_info = DESTINATION_HUB_MAP.get(wd["keyword"], {})
         hubs = dest_info.get("hubs", [])
         dest_airports = dest_info.get("airports", [])
-        region = dest_info.get("region", "")
-        est_prices = dest_info.get("est_prices", EST_HUB_PRICES.get(region, {}))
 
         best = None
         alternatives = []
 
         for hub in hubs:
-            est_hub_dest_pp = est_prices.get(hub, DEFAULT_EST_PRICE)
             for origin in origins_to_check:
                 out_fares = fare_cache_out.get((origin, hub), [])
                 ret_fares = fare_cache_ret.get((hub, origin), [])
@@ -2222,22 +2220,22 @@ def warm_search(params):
                 if out_pp >= 99999 or ret_pp >= 99999:
                     continue
 
-                total_pp = out_pp + ret_pp + est_hub_dest_pp
-                grand_total = round(total_pp * pax, 2)
+                # Only confirmed Ryanair prices — PL↔Hub round trip
+                ryanair_rt_pp = out_pp + ret_pp
+                ryanair_rt_total = round(ryanair_rt_pp * pax, 2)
 
                 route = {
                     "hub": hub,
                     "origin": origin,
                     "out_pp": out_pp,
                     "ret_pp": ret_pp,
-                    "est_hub_dest_pp": est_hub_dest_pp,
-                    "total_pp": round(total_pp, 2),
-                    "grand_total": grand_total,
+                    "ryanair_rt_pp": round(ryanair_rt_pp, 2),
+                    "ryanair_rt_total": ryanair_rt_total,
                     "out_date": cheapest_out.get("date", date_out_from),
                     "ret_date": cheapest_ret.get("date", date_ret_from),
                 }
 
-                if best is None or grand_total < best["grand_total"]:
+                if best is None or ryanair_rt_total < best["ryanair_rt_total"]:
                     if best:
                         alternatives.append(best)
                     best = route
@@ -2247,11 +2245,11 @@ def warm_search(params):
         if best is None:
             continue
 
-        if max_budget and best["grand_total"] > max_budget:
+        if max_budget and best["ryanair_rt_total"] > max_budget:
             continue
 
-        # Sort alternatives by price, keep top 3
-        alternatives.sort(key=lambda x: x["grand_total"])
+        # Sort alternatives by confirmed price, keep top 3
+        alternatives.sort(key=lambda x: x["ryanair_rt_total"])
         alternatives = alternatives[:3]
 
         primary_dest = dest_airports[0] if dest_airports else ""
@@ -2262,9 +2260,9 @@ def warm_search(params):
             "origin": best["origin"],
             "out_pp": best["out_pp"],
             "ret_pp": best["ret_pp"],
-            "est_hub_dest_pp": best["est_hub_dest_pp"],
-            "total_pp": best["total_pp"],
-            "grand_total": best["grand_total"],
+            "ryanair_rt_pp": best["ryanair_rt_pp"],
+            "ryanair_rt_total": best["ryanair_rt_total"],
+            "grand_total": best["ryanair_rt_total"],  # for scoring compatibility
             "out_date": best["out_date"],
             "ret_date": best["ret_date"],
             "pax": pax,
@@ -2273,11 +2271,12 @@ def warm_search(params):
                 "ryanair_out": f"https://www.ryanair.com/pl/pl/trip/flights/select?adults={adults}&teens=0&children={children}&infants=0&dateOut={best['out_date']}&originIata={best['origin']}&destinationIata={best['hub']}",
                 "ryanair_ret": f"https://www.ryanair.com/pl/pl/trip/flights/select?adults={adults}&teens=0&children={children}&infants=0&dateOut={best['ret_date']}&originIata={best['hub']}&destinationIata={best['origin']}",
                 "google_flights": build_google_flights_url(best["hub"], primary_dest, date_out_from, date_ret_from, adults, children),
+                "google_flights_hub_dest": build_google_flights_url(best["hub"], primary_dest, best["out_date"], best["ret_date"], adults, children),
                 "kiwi_full": f"https://www.kiwi.com/pl/search/tiles/{best['origin'].lower()}/{primary_dest.lower()}/{date_out_from}/{date_ret_from}?adults={adults}&children={children}&sortBy=price",
             },
         })
 
-    results.sort(key=lambda x: x["grand_total"])
+    results.sort(key=lambda x: x["ryanair_rt_total"])
 
     MONTH_NAMES_PL = {1: "styczeń", 2: "luty", 3: "marzec", 4: "kwiecień", 5: "maj", 6: "czerwiec",
                       7: "lipiec", 8: "sierpień", 9: "wrzesień", 10: "październik", 11: "listopad", 12: "grudzień"}

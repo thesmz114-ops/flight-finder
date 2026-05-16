@@ -234,7 +234,8 @@
                     <p style="font-size:12px;color:#7c3aed;margin-bottom:20px">Analiza: cena × pogoda × bezpieczeństwo × plaże × kuchnia × kultura × sezon</p>`;
 
                 recommendations.forEach(p => {
-                    const priceColor = p.grand_total <= 5000 ? '#22c55e' : p.grand_total <= 8000 ? '#f59e0b' : '#f97316';
+                    const ryanairTotal = p.ryanair_rt_total || p.grand_total;
+                    const ryanairPP = p.ryanair_rt_pp || (p.out_pp + p.ret_pp);
                     html += `<div style="background:linear-gradient(135deg,#111535,#0f1330);border:2px solid ${p.color}44;border-radius:14px;margin-bottom:16px;overflow:hidden;transition:border-color 0.2s"
                         onmouseover="this.style.borderColor='${p.color}'" onmouseout="this.style.borderColor='${p.color}44'">
 
@@ -249,29 +250,30 @@
                                 </div>
                             </div>
                             <div style="text-align:right">
-                                <div style="font-size:28px;font-weight:800;color:${priceColor}">${Math.round(p.grand_total)} PLN</div>
-                                <div style="font-size:12px;color:#94a3b8">${Math.round(p.total_pp)} PLN/os × ${p.pax} os.</div>
+                                <div style="font-size:24px;font-weight:800;color:#22c55e">${Math.round(ryanairTotal)} PLN</div>
+                                <div style="font-size:11px;color:#22c55e;font-weight:600">✅ Potwierdzona cena Ryanair PL↔Hub</div>
+                                <div style="font-size:11px;color:#94a3b8">${Math.round(ryanairPP)} PLN/os × ${p.pax} os.</div>
                             </div>
                         </div>
 
                         <!-- Route breakdown -->
                         <div style="padding:16px 20px;display:flex;flex-wrap:wrap;gap:10px;align-items:center">
-                            <div style="background:#1e293b;border-radius:10px;padding:12px 16px;flex:1;min-width:180px">
-                                <div style="font-size:11px;color:#64748b;text-transform:uppercase;margin-bottom:4px">🇵🇱 Wylot z Polski</div>
+                            <div style="background:#052e16;border:1px solid #22c55e44;border-radius:10px;padding:12px 16px;flex:1;min-width:180px">
+                                <div style="font-size:11px;color:#22c55e;text-transform:uppercase;margin-bottom:4px">✅ Wylot z Polski</div>
                                 <div style="font-size:16px;font-weight:700;color:#e2e8f0">${p.origin} → ${p.hub}</div>
                                 <div style="font-size:12px;color:#94a3b8">Ryanair · ${p.out_date}</div>
                                 <div style="font-size:15px;font-weight:700;color:#22c55e;margin-top:4px">${Math.round(p.out_pp)} PLN/os</div>
                             </div>
                             <div style="font-size:20px;color:${p.color}">✈→</div>
-                            <div style="background:#1e293b;border-radius:10px;padding:12px 16px;flex:1;min-width:180px">
-                                <div style="font-size:11px;color:#64748b;text-transform:uppercase;margin-bottom:4px">✈ Hub → Destynacja</div>
-                                <div style="font-size:16px;font-weight:700;color:#e2e8f0">${p.hub} → ${p.dest_airport}</div>
+                            <div style="background:#1e293b;border:1px dashed #f59e0b44;border-radius:10px;padding:12px 16px;flex:1;min-width:180px">
+                                <div style="font-size:11px;color:#f59e0b;text-transform:uppercase;margin-bottom:4px">🔍 Hub ↔ Destynacja (RT)</div>
+                                <div style="font-size:16px;font-weight:700;color:#e2e8f0">${p.hub} ↔ ${p.dest_airport}</div>
                                 <div style="font-size:12px;color:#94a3b8">Różne linie · w obie strony</div>
-                                <div style="font-size:15px;font-weight:700;color:#f59e0b;margin-top:4px">~${Math.round(p.est_hub_dest_pp)} PLN/os <span style="font-size:11px;color:#64748b">(szacunek)</span></div>
+                                <a href="${p.links.google_flights_hub_dest || p.links.google_flights}" target="_blank" style="display:inline-block;margin-top:6px;padding:4px 12px;background:#f59e0b;color:#0a0e27;border-radius:6px;font-size:12px;font-weight:700;text-decoration:none">Sprawdź cenę →</a>
                             </div>
                             <div style="font-size:20px;color:${p.color}">✈→</div>
-                            <div style="background:#1e293b;border-radius:10px;padding:12px 16px;flex:1;min-width:180px">
-                                <div style="font-size:11px;color:#64748b;text-transform:uppercase;margin-bottom:4px">🇵🇱 Powrót</div>
+                            <div style="background:#052e16;border:1px solid #22c55e44;border-radius:10px;padding:12px 16px;flex:1;min-width:180px">
+                                <div style="font-size:11px;color:#22c55e;text-transform:uppercase;margin-bottom:4px">✅ Powrót do Polski</div>
                                 <div style="font-size:16px;font-weight:700;color:#e2e8f0">${p.hub} → ${p.origin}</div>
                                 <div style="font-size:12px;color:#94a3b8">Ryanair · ${p.ret_date}</div>
                                 <div style="font-size:15px;font-weight:700;color:#22c55e;margin-top:4px">${Math.round(p.ret_pp)} PLN/os</div>
@@ -298,14 +300,15 @@
 
             // Header
             html += `<div style="background:linear-gradient(135deg,#451a0322,#f59e0b11);border:1px solid #f59e0b44;border-radius:12px;padding:20px;margin-bottom:24px">
-                <h3 style="color:#fbbf24;margin-bottom:8px">☀ Wszystkie ciepłe destynacje — ${month_name} (min. ${min_temp}°C) — posortowane od najtańszego</h3>
-                <p style="font-size:13px;color:#94a3b8">Znaleziono <strong style="color:#e2e8f0">${results.length}</strong> destynacji z temperaturą powyżej ${min_temp}°C · Sprawdzono <strong style="color:#e2e8f0">${hubs_checked}</strong> hubów · Ceny dla <strong style="color:#e2e8f0">${pax}</strong> osób</p>
-                <p style="font-size:11px;color:#64748b;margin-top:6px">Ceny PL → Hub to realne ceny Ryanair. Ceny Hub → Destynacja to szacunki — kliknij linki aby sprawdzić.</p>
+                <h3 style="color:#fbbf24;margin-bottom:8px">☀ Wszystkie ciepłe destynacje — ${month_name} (min. ${min_temp}°C)</h3>
+                <p style="font-size:13px;color:#94a3b8">Znaleziono <strong style="color:#e2e8f0">${results.length}</strong> destynacji · Sprawdzono <strong style="color:#e2e8f0">${hubs_checked}</strong> hubów · Posortowane od najtańszego lotu PL↔Hub</p>
+                <p style="font-size:11px;color:#22c55e;margin-top:6px">✅ Wszystkie ceny to potwierdzone ceny Ryanair. Cenę Hub↔Destynacja sprawdź przez linki.</p>
             </div>`;
 
             // Result cards
             results.forEach((r, i) => {
-                const priceColor = warmPriceClass(r.grand_total);
+                const ryanairTotal = r.ryanair_rt_total || r.grand_total;
+                const ryanairPP = r.ryanair_rt_pp || (r.out_pp + r.ret_pp);
                 html += `<div class="route-card">
                     <div class="route-header">
                         <div style="display:flex;align-items:center;gap:16px">
@@ -317,40 +320,44 @@
                             </div>
                         </div>
                         <div class="route-price">
-                            <div class="europe" style="color:${priceColor}">${Math.round(r.grand_total)} PLN</div>
-                            <div class="pp">${Math.round(r.total_pp)} PLN/os × ${pax} os.</div>
+                            <div class="europe" style="color:#22c55e">${Math.round(ryanairTotal)} PLN</div>
+                            <div class="pp" style="color:#22c55e">✅ Ryanair PL↔${r.hub} · ${Math.round(ryanairPP)} PLN/os × ${pax} os.</div>
                         </div>
                     </div>
                     <div class="route-body">
-                        <div class="route-legs">
-                            <div class="leg">
-                                <div class="leg-label">🇵🇱 Polska → Hub</div>
+                        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+                            <div style="background:#052e16;border:1px solid #22c55e44;border-radius:10px;padding:12px 16px;flex:1;min-width:140px">
+                                <div style="font-size:11px;color:#22c55e;margin-bottom:4px">✅ WYLOT</div>
                                 <div class="leg-route">${r.origin} → ${r.hub}</div>
                                 <div class="leg-detail">Ryanair · ${r.out_date}</div>
                                 <div class="leg-price">${Math.round(r.out_pp)} PLN/os</div>
                             </div>
-                            <div class="leg-arrow">✈ →</div>
-                            <div class="leg">
-                                <div class="leg-label">Hub → Destynacja (szacunek)</div>
-                                <div class="leg-route">${r.hub} → ${r.dest_airports[0]}</div>
-                                <div class="leg-detail">Różne linie · w obie strony</div>
-                                <div class="leg-price" style="color:#f59e0b">~${Math.round(r.est_hub_dest_pp)} PLN/os (RT)</div>
+                            <div style="font-size:18px;color:#f59e0b">→</div>
+                            <div style="background:#1e293b;border:1px dashed #f59e0b44;border-radius:10px;padding:12px 16px;flex:1;min-width:140px;text-align:center">
+                                <div style="font-size:11px;color:#f59e0b;margin-bottom:4px">🔍 HUB ↔ DESTYNACJA</div>
+                                <div class="leg-route">${r.hub} ↔ ${r.dest_airports[0]}</div>
+                                <a href="${r.links.google_flights_hub_dest || r.links.google_flights}" target="_blank" style="display:inline-block;margin-top:6px;padding:4px 12px;background:#f59e0b;color:#0a0e27;border-radius:6px;font-size:12px;font-weight:700;text-decoration:none">Sprawdź cenę →</a>
                             </div>
-                        </div>
-                        <div style="margin-top:10px;padding-top:10px;border-top:1px solid #1e293b;font-size:12px;color:#64748b">
-                            Powrót ${r.hub} → ${r.origin}: <strong style="color:#22c55e">${Math.round(r.ret_pp)} PLN/os</strong> (Ryanair · ${r.ret_date})`;
+                            <div style="font-size:18px;color:#f59e0b">→</div>
+                            <div style="background:#052e16;border:1px solid #22c55e44;border-radius:10px;padding:12px 16px;flex:1;min-width:140px">
+                                <div style="font-size:11px;color:#22c55e;margin-bottom:4px">✅ POWRÓT</div>
+                                <div class="leg-route">${r.hub} → ${r.origin}</div>
+                                <div class="leg-detail">Ryanair · ${r.ret_date}</div>
+                                <div class="leg-price">${Math.round(r.ret_pp)} PLN/os</div>
+                            </div>
+                        </div>`;
 
                 if (r.alternatives && r.alternatives.length) {
-                    html += ` · Inne trasy: `;
+                    html += `<div style="margin-top:10px;padding-top:10px;border-top:1px solid #1e293b;font-size:12px;color:#64748b">Inne trasy: `;
                     r.alternatives.forEach(alt => {
-                        html += `<span style="margin-left:6px;color:#94a3b8">${alt.origin}→${alt.hub} ${Math.round(alt.grand_total)} PLN</span>`;
+                        html += `<span style="margin-left:6px;color:#94a3b8">${alt.origin}→${alt.hub} <strong>${Math.round(alt.ryanair_rt_total || alt.grand_total)} PLN</strong></span>`;
                     });
+                    html += '</div>';
                 }
                 html += `</div>
-                    </div>
                     <div class="route-links">
-                        <a href="${r.links.ryanair_out}" target="_blank" class="route-link primary">Ryanair ${r.origin}→${r.hub}</a>
-                        <a href="${r.links.ryanair_ret}" target="_blank" class="route-link primary">Ryanair ${r.hub}→${r.origin}</a>
+                        <a href="${r.links.ryanair_out}" target="_blank" class="route-link primary">Kup Ryanair ${r.origin}→${r.hub}</a>
+                        <a href="${r.links.ryanair_ret}" target="_blank" class="route-link primary">Kup Ryanair ${r.hub}→${r.origin}</a>
                         <a href="${r.links.google_flights}" target="_blank" class="route-link">Google Flights ${r.hub}→${r.dest_airports[0]}</a>
                         <a href="${r.links.kiwi_full}" target="_blank" class="route-link">Kiwi pełna trasa</a>
                     </div>
