@@ -183,8 +183,8 @@ def fetch_kayak_price(origin, dest, date_out, date_ret, adults=1, max_stops=None
         )
         page = ctx.new_page()
         page.add_init_script('Object.defineProperty(navigator, "webdriver", {get: () => undefined})')
-        page.goto(url, timeout=25000)
-        page.wait_for_timeout(12000)
+        page.goto(url, timeout=35000)
+        page.wait_for_timeout(15000)
 
         # Use Kayak's price CSS selector for accurate prices
         parsed = []
@@ -2360,10 +2360,12 @@ def search_multi():
     return jsonify(result)
 
 
+_price_lock = threading.Lock()
+
 @app.route("/fetch-price", methods=["POST"])
 def fetch_price():
-    """Fetch real price from Kayak by scraping via Playwright.
-    Returns price per person for a round-trip hub↔destination."""
+    """Fetch real price from Kayak via shared Playwright browser.
+    Sequential (1 at a time) to avoid memory issues on Railway."""
     data = request.json or {}
     hub = data.get("hub", "STN")
     dest = data.get("dest", "BKK")
@@ -2374,12 +2376,19 @@ def fetch_price():
     pax = adults + children
 
     gf_url = build_google_flights_url(hub, dest, date_out, date_ret, adults, children)
+    kayak_url = (f"https://www.kayak.pl/flights/{hub}-{dest}/{date_out}/{date_ret}"
+                 f"?sort=price_a&currency=PLN")
 
-    # Try Kayak scraping for real price (1 adult, then multiply)
-    price_1adult, kayak_url = fetch_kayak_price(hub, dest, date_out, date_ret, adults=1)
+    # Serialize scraping — only one Playwright page at a time
+    with _price_lock:
+        try:
+            price_1adult, _ = fetch_kayak_price(hub, dest, date_out, date_ret, adults=1)
+        except Exception as e:
+            log.error(f"fetch-price error {hub}→{dest}: {e}")
+            price_1adult = None
 
     if price_1adult:
-        price_pp = price_1adult  # Kayak returns per-person price for 1 adult
+        price_pp = price_1adult
         total = price_pp * pax
         return jsonify({
             "hub": hub, "dest": dest,
@@ -2396,7 +2405,7 @@ def fetch_price():
             "hub": hub, "dest": dest,
             "price_pp": None,
             "confirmed": False,
-            "error": "Nie udało się pobrać ceny",
+            "error": "Nie udało się pobrać ceny z Kayak",
             "google_flights_url": gf_url,
             "kayak_url": kayak_url,
         })

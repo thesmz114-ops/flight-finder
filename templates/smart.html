@@ -449,9 +449,10 @@
             pricesFetched = 0;
             updateProgressBar();
 
-            // Fetch in parallel (max 5 concurrent)
+            // Fetch sequentially (server handles 1 at a time via lock)
+            // Use 2 workers — server queues them, but pipelining saves round-trip time
             const queue = [...unique];
-            const workers = Math.min(5, queue.length);
+            const workers = Math.min(2, queue.length);
 
             async function worker() {
                 while (queue.length > 0) {
