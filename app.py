@@ -2461,8 +2461,8 @@ def warm_search(params):
         alternatives = alternatives[:3]
 
         primary_dest = dest_airports[0] if dest_airports else ""
-        out_airline = best.get("out_airline", "Ryanair")
-        ret_airline = best.get("ret_airline", "Ryanair")
+        out_airline = best.get("out_airline", "Ryanair") if best else ""
+        ret_airline = best.get("ret_airline", "Ryanair") if best else ""
 
         # Build booking links per airline
         def airline_link(airline, origin, dest, date, adults, children):
@@ -2488,35 +2488,43 @@ def warm_search(params):
             effective_total = 999999
             effective_pp = 0
 
+        b_hub = best["hub"] if best else ""
+        b_origin = best["origin"] if best else "WAW"
+        b_out_date = best["out_date"] if best else date_out_from
+        b_ret_date = best["ret_date"] if best else date_ret_from
+
+        links = {
+            "charter_rainbow": f"https://biletyczarterowe.r.pl/wyszukaj/{wd['keyword']}",
+            "charter_itaka": build_itaka_url(wd["keyword"]),
+            "charter_tui": build_tui_url(wd["keyword"]),
+            "kiwi_full": f"https://www.kiwi.com/pl/search/tiles/warsaw-poland/{primary_dest.lower()}/{date_out_from}/{date_ret_from}?adults={adults}&children={children}&sortBy=price",
+            "google_flights": build_google_flights_url("WAW", primary_dest, date_out_from, date_ret_from, adults, children),
+        }
+        if best:
+            links["book_out"] = airline_link(out_airline, b_origin, b_hub, b_out_date, adults, children)
+            links["book_ret"] = airline_link(ret_airline, b_hub, b_origin, b_ret_date, adults, children)
+            links["ryanair_out"] = f"https://www.ryanair.com/pl/pl/trip/flights/select?adults={adults}&teens=0&children={children}&infants=0&dateOut={b_out_date}&originIata={b_origin}&destinationIata={b_hub}"
+            links["ryanair_ret"] = f"https://www.ryanair.com/pl/pl/trip/flights/select?adults={adults}&teens=0&children={children}&infants=0&dateOut={b_ret_date}&originIata={b_hub}&destinationIata={b_origin}"
+            links["google_flights_hub_dest"] = build_google_flights_url(b_hub, primary_dest, b_out_date, b_ret_date, adults, children)
+
         results.append({
             **wd,
             "dest_airports": dest_airports,
-            "hub": best["hub"] if best else "",
-            "origin": best["origin"] if best else (charter_offer["origin"] if charter_offer else "WAW"),
+            "hub": b_hub,
+            "origin": b_origin,
             "out_pp": best["out_pp"] if best else 0,
             "ret_pp": best["ret_pp"] if best else 0,
-            "out_airline": out_airline if best else "",
-            "ret_airline": ret_airline if best else "",
+            "out_airline": out_airline,
+            "ret_airline": ret_airline,
             "ryanair_rt_pp": best["ryanair_rt_pp"] if best else 0,
             "ryanair_rt_total": best["ryanair_rt_total"] if best else 0,
             "grand_total": effective_total,
             "charter": charter_offer,
-            "out_date": best["out_date"],
-            "ret_date": best["ret_date"],
+            "out_date": b_out_date,
+            "ret_date": b_ret_date,
             "pax": pax,
             "alternatives": alternatives,
-            "links": {
-                "book_out": airline_link(out_airline, best["origin"], best["hub"], best["out_date"], adults, children),
-                "book_ret": airline_link(ret_airline, best["hub"], best["origin"], best["ret_date"], adults, children),
-                "ryanair_out": f"https://www.ryanair.com/pl/pl/trip/flights/select?adults={adults}&teens=0&children={children}&infants=0&dateOut={best['out_date']}&originIata={best['origin']}&destinationIata={best['hub']}",
-                "ryanair_ret": f"https://www.ryanair.com/pl/pl/trip/flights/select?adults={adults}&teens=0&children={children}&infants=0&dateOut={best['ret_date']}&originIata={best['hub']}&destinationIata={best['origin']}",
-                "google_flights": build_google_flights_url(best["hub"], primary_dest, date_out_from, date_ret_from, adults, children),
-                "google_flights_hub_dest": build_google_flights_url(best["hub"], primary_dest, best["out_date"], best["ret_date"], adults, children),
-                "kiwi_full": f"https://www.kiwi.com/pl/search/tiles/{best['origin'].lower()}/{primary_dest.lower()}/{date_out_from}/{date_ret_from}?adults={adults}&children={children}&sortBy=price",
-                "charter_rainbow": f"https://biletyczarterowe.r.pl/wyszukaj/{wd['keyword']}",
-                "charter_itaka": build_itaka_url(wd["keyword"]),
-                "charter_tui": build_tui_url(wd["keyword"]),
-            },
+            "links": links,
         })
 
     results.sort(key=lambda x: x["ryanair_rt_total"])
