@@ -402,13 +402,18 @@
                             <div style="text-align:right">
                                 ${p.best_source === 'charter' && p.charter ?
                                     `<div style="font-size:28px;font-weight:800;color:#22c55e">${Math.round(p.charter.total)} PLN</div>
-                                     <div style="font-size:11px;color:#22c55e">✅ Czarter ${p.charter.airline}</div>` :
+                                     <div style="font-size:11px;color:#22c55e">✅ Czarter ${p.charter.airline} · cała podróż</div>
+                                     <div style="font-size:11px;color:#94a3b8">${Math.round(p.charter.price_pp)} PLN/os × ${p.pax} os.</div>` :
+                                 p.best_source === 'direct' ?
+                                    `<div style="font-size:28px;font-weight:800;color:#22c55e">${Math.round(ryanairTotal)} PLN</div>
+                                     <div style="font-size:11px;color:#22c55e">✅ Lot bezpośredni · cała podróż</div>
+                                     <div style="font-size:11px;color:#94a3b8">${Math.round(ryanairPP)} PLN/os × ${p.pax} os.</div>` :
                                  p.price_confirmed && p.full_total ?
                                     `<div style="font-size:28px;font-weight:800;color:#22c55e">${Math.round(p.full_total)} PLN</div>
                                      <div style="font-size:11px;color:#22c55e">✅ Pełna cena potwierdzona</div>
                                      <div style="font-size:11px;color:#94a3b8">${Math.round(p.full_pp)} PLN/os × ${p.pax} os.</div>` :
-                                    `<div style="font-size:24px;font-weight:800;color:#f59e0b">${Math.round(ryanairTotal)} PLN</div>
-                                     <div style="font-size:11px;color:#f59e0b">PL↔Hub + sprawdź Hub↔Dest</div>`}
+                                    `<div style="font-size:14px;color:#94a3b8">PL↔${p.hub}: <span style="color:#22c55e">${Math.round(ryanairTotal)} PLN ✅</span></div>
+                                     <div style="font-size:14px;color:#f59e0b;margin-top:2px">${p.hub}↔${p.dest_airport}: sprawdź cenę</div>`}
                             </div>
                         </div>
 
@@ -504,18 +509,19 @@
                         <div class="route-price">
                             ${r.best_source === 'charter' && ch ?
                                 `<div style="font-size:22px;font-weight:800;color:#22c55e">${Math.round(ch.total)} PLN</div>
-                                 <div style="font-size:11px;color:#22c55e">✅ Czarter ${ch.airline}</div>` :
+                                 <div style="font-size:11px;color:#22c55e">✅ Czarter ${ch.airline} · cała podróż</div>
+                                 <div style="font-size:10px;color:#94a3b8">${Math.round(ch.price_pp)} PLN/os × ${pax} os.</div>` :
+                             r.best_source === 'direct' ?
+                                `<div style="font-size:22px;font-weight:800;color:#22c55e">${Math.round(ryanairTotal)} PLN</div>
+                                 <div style="font-size:11px;color:#22c55e">✅ Lot bezpośredni · cała podróż</div>
+                                 <div style="font-size:10px;color:#94a3b8">${Math.round(ryanairPP)} PLN/os × ${pax} os.</div>` :
                              r.price_confirmed && r.full_total ?
                                 `<div style="font-size:22px;font-weight:800;color:#22c55e">${Math.round(r.full_total)} PLN</div>
-                                 <div style="font-size:11px;color:#22c55e">✅ Pełna cena</div>
+                                 <div style="font-size:11px;color:#22c55e">✅ Potwierdzona pełna cena</div>
                                  <div style="font-size:10px;color:#94a3b8">${Math.round(r.full_pp)} PLN/os × ${pax} os.</div>` :
-                             ryanairTotal && (r.hub && r.dest_airports && r.dest_airports.includes(r.hub)) ?
-                                `<div style="font-size:22px;font-weight:800;color:#22c55e">${Math.round(ryanairTotal)} PLN</div>
-                                 <div style="font-size:11px;color:#22c55e">✅ Lot bezpośredni</div>
-                                 <div style="font-size:10px;color:#94a3b8">${Math.round(ryanairPP)} PLN/os × ${pax} os.</div>` :
                              ryanairTotal ?
-                                `<div style="font-size:18px;font-weight:700;color:#f59e0b">${Math.round(ryanairTotal)} PLN</div>
-                                 <div style="font-size:11px;color:#f59e0b">PL↔Hub + sprawdź Hub↔Dest</div>` :
+                                `<div style="font-size:13px;color:#94a3b8">PL↔${r.hub}: <span style="color:#22c55e">${Math.round(ryanairTotal)} PLN ✅</span></div>
+                                 <div style="font-size:13px;color:#f59e0b;margin-top:2px">${r.hub}↔${(r.dest_airports||[])[0]||'?'}: sprawdź cenę</div>` :
                                 `<div style="font-size:14px;color:#60a5fa">🔍 Kliknij aby wyszukać</div>
                                  <div style="font-size:11px;color:#64748b">Szukaj lotów do ${r.desc}</div>`}
                         </div>
