@@ -1745,7 +1745,7 @@ def search_charter_rainbow(date_from, date_to, adults=2, children=2):
                         "airline": dl.get("brand", "Charter"),
                         "baggage_kg": d.get("Bagaz", 0),
                         "source": "Rainbow Charter",
-                        "url": f"https://biletyczarterowe.r.pl/wyszukaj?skad=WAW&dokad={d.get('Klucz','')}&dataMin={date_from}&dataMax={date_to}",
+                        "url": f"https://biletyczarterowe.r.pl/szukaj?skad=WAW&dokad={d.get('Klucz','')}",
                     })
         else:
             log.warning(f"Rainbow charter API: HTTP {r.status_code}")
@@ -1776,7 +1776,7 @@ def search_charter_rainbow(date_from, date_to, adults=2, children=2):
                             "airline": dl.get("brand", "Charter"),
                             "baggage_kg": d.get("Bagaz", 0),
                             "source": "Rainbow Charter",
-                            "url": f"https://biletyczarterowe.r.pl/wyszukaj?skad={origin}&dokad={d.get('Klucz','')}&dataMin={date_from}&dataMax={date_to}",
+                            "url": f"https://biletyczarterowe.r.pl/szukaj?skad={origin}&dokad={d.get('Klucz','')}",
                         })
         except Exception:
             pass
@@ -2533,7 +2533,7 @@ def warm_search(params):
         b_ret_date = best["ret_date"] if best else date_ret_from
 
         links = {
-            "charter_rainbow": f"https://biletyczarterowe.r.pl/wyszukaj/{wd['keyword']}",
+            "charter_rainbow": f"https://biletyczarterowe.r.pl/szukaj?dokad={primary_dest}",
             "charter_itaka": build_itaka_url(wd["keyword"]),
             "charter_tui": build_tui_url(wd["keyword"]),
             "kiwi_full": f"https://www.kiwi.com/pl/search/tiles/warsaw-poland/{primary_dest.lower()}/{date_out_from}/{date_ret_from}?adults={adults}&children={children}&sortBy=price",

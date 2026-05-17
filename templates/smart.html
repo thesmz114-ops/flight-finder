@@ -480,15 +480,44 @@
                                  <div style="font-size:11px;color:#22c55e">✅ Czarter ${ch.airline}</div>` :
                              r.price_confirmed && r.full_total ?
                                 `<div style="font-size:22px;font-weight:800;color:#22c55e">${Math.round(r.full_total)} PLN</div>
-                                 <div style="font-size:11px;color:#22c55e">✅ Potwierdzona pełna cena</div>
+                                 <div style="font-size:11px;color:#22c55e">✅ Pełna cena</div>
                                  <div style="font-size:10px;color:#94a3b8">${Math.round(r.full_pp)} PLN/os × ${pax} os.</div>` :
+                             ryanairTotal && (r.hub && r.dest_airports && r.dest_airports.includes(r.hub)) ?
+                                `<div style="font-size:22px;font-weight:800;color:#22c55e">${Math.round(ryanairTotal)} PLN</div>
+                                 <div style="font-size:11px;color:#22c55e">✅ Lot bezpośredni</div>
+                                 <div style="font-size:10px;color:#94a3b8">${Math.round(ryanairPP)} PLN/os × ${pax} os.</div>` :
+                             ryanairTotal ?
                                 `<div style="font-size:18px;font-weight:700;color:#f59e0b">${Math.round(ryanairTotal)} PLN</div>
-                                 <div style="font-size:11px;color:#f59e0b">PL↔Hub (+ Hub↔Dest w linkach)</div>`}
+                                 <div style="font-size:11px;color:#f59e0b">PL↔Hub + sprawdź Hub↔Dest</div>` :
+                                `<div style="font-size:14px;color:#64748b">Brak cen na te daty</div>
+                                 <div style="font-size:11px;color:#64748b">Sprawdź w linkach poniżej</div>`}
                         </div>
                     </div>
                     ${charterHtml}
-                    <div class="route-body">
-                        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center${ryanairTotal ? '' : ';display:none'}">
+                    <div class="route-body">`;
+
+                const isDirect = r.hub && r.dest_airports && r.dest_airports.includes(r.hub);
+
+                if (ryanairTotal && isDirect) {
+                    // DIRECT FLIGHT — 2 boxes: outbound + return
+                    html += `<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+                            <div style="background:#052e16;border:1px solid #22c55e44;border-radius:10px;padding:14px 16px;flex:1;min-width:180px">
+                                <div style="font-size:11px;color:#22c55e;margin-bottom:4px">✅ WYLOT BEZPOŚREDNI</div>
+                                <div class="leg-route">${r.origin} → ${r.hub}</div>
+                                <div class="leg-detail">${r.out_airline || 'Ryanair'} · ${r.out_date}</div>
+                                <div class="leg-price">${Math.round(r.out_pp)} PLN/os</div>
+                            </div>
+                            <div style="font-size:18px;color:#22c55e">✈ →</div>
+                            <div style="background:#052e16;border:1px solid #22c55e44;border-radius:10px;padding:14px 16px;flex:1;min-width:180px">
+                                <div style="font-size:11px;color:#22c55e;margin-bottom:4px">✅ POWRÓT BEZPOŚREDNI</div>
+                                <div class="leg-route">${r.hub} → ${r.origin}</div>
+                                <div class="leg-detail">${r.ret_airline || 'Ryanair'} · ${r.ret_date}</div>
+                                <div class="leg-price">${Math.round(r.ret_pp)} PLN/os</div>
+                            </div>
+                        </div>`;
+                } else if (ryanairTotal && !isDirect) {
+                    // VIA HUB — 3 boxes: outbound + hub↔dest + return
+                    html += `<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
                             <div style="background:#052e16;border:1px solid #22c55e44;border-radius:10px;padding:12px 16px;flex:1;min-width:140px">
                                 <div style="font-size:11px;color:#22c55e;margin-bottom:4px">✅ WYLOT</div>
                                 <div class="leg-route">${r.origin} → ${r.hub}</div>
@@ -497,11 +526,10 @@
                             </div>
                             <div style="font-size:18px;color:#f59e0b">→</div>
                             <div style="background:${r.hub_dest_pp ? '#052e16;border:1px solid #22c55e44' : '#1e293b;border:1px dashed #f59e0b44'};border-radius:10px;padding:12px 16px;flex:1;min-width:140px;text-align:center">
-                                <div style="font-size:11px;color:${r.hub_dest_pp ? '#22c55e' : '#f59e0b'};margin-bottom:4px">${r.hub_dest_pp ? '✅' : '✈'} HUB ↔ DESTYNACJA</div>
-                                <div class="leg-route">${r.hub} ↔ ${r.dest_airports[0]}</div>
+                                <div style="font-size:11px;color:${r.hub_dest_pp ? '#22c55e' : '#f59e0b'};margin-bottom:4px">${r.hub_dest_pp ? '✅' : '✈'} HUB → DEST</div>
+                                <div class="leg-route">${r.hub} → ${r.dest_airports[0]}</div>
                                 ${r.hub_dest_pp ?
-                                    `<div style="font-size:15px;font-weight:700;color:#22c55e;margin-top:6px">${Math.round(r.hub_dest_pp)} PLN/os ✅</div>
-                                     <div style="font-size:10px;color:#64748b">Kayak · potwierdzona</div>` :
+                                    `<div style="font-size:15px;font-weight:700;color:#22c55e;margin-top:6px">${Math.round(r.hub_dest_pp)} PLN/os ✅</div>` :
                                     `<a href="${r.links.google_flights_hub_dest || r.links.google_flights}" target="_blank" style="display:inline-block;margin-top:6px;padding:4px 12px;background:#f59e0b;color:#0a0e27;border-radius:6px;font-size:12px;font-weight:700;text-decoration:none">Sprawdź cenę →</a>`}
                             </div>
                             <div style="font-size:18px;color:#f59e0b">→</div>
@@ -512,6 +540,9 @@
                                 <div class="leg-price">${Math.round(r.ret_pp)} PLN/os</div>
                             </div>
                         </div>`;
+                }
+
+                html += ``;
 
                 if (r.alternatives && r.alternatives.length) {
                     html += `<div style="margin-top:10px;padding-top:10px;border-top:1px solid #1e293b;font-size:12px;color:#64748b">Inne trasy: `;
