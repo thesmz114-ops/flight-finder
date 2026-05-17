@@ -235,14 +235,14 @@
 
                 showLoadingCircle(div, 35, `✅ Znaleziono ${data.results.length} destynacji. Pobieram ceny Hub↔Dest...`);
 
-                // PHASE 2: Fetch Kayak prices for hub↔dest (only for results that need it)
-                const needsPrice = data.results.filter(r => !r.charter || (r.ryanair_rt_total && r.charter && r.charter.total > r.ryanair_rt_total));
+                // PHASE 2: Fetch Kayak prices for hub↔dest (only non-direct, non-charter routes)
                 const uniquePairs = {};
-                needsPrice.forEach(r => {
-                    if (r.hub && r.dest_airports && r.dest_airports[0]) {
-                        const key = `${r.hub}-${r.dest_airports[0]}`;
-                        if (!uniquePairs[key]) uniquePairs[key] = { hub: r.hub, dest: r.dest_airports[0], out_date: r.out_date, ret_date: r.ret_date };
-                    }
+                data.results.forEach(r => {
+                    if (!r.hub || !r.dest_airports || !r.dest_airports[0]) return;
+                    if (r.dest_airports.includes(r.hub)) return; // direct flight — no hub→dest needed
+                    if (r.ryanair_rt_total <= 0) return; // no hub route found
+                    const key = `${r.hub}-${r.dest_airports[0]}`;
+                    if (!uniquePairs[key]) uniquePairs[key] = { hub: r.hub, dest: r.dest_airports[0], out_date: r.out_date, ret_date: r.ret_date };
                 });
 
                 const pairsToFetch = Object.values(uniquePairs);
@@ -299,8 +299,16 @@
                             r.price_confirmed = true;
                         }
                     }
-                    // If charter is available, compare with full trip price
-                    if (r.charter) {
+                    // Determine best price source
+                    const isDirect = r.hub && r.dest_airports && r.dest_airports.includes(r.hub);
+                    if (isDirect && r.ryanair_rt_total > 0) {
+                        // Direct flight — full confirmed price
+                        r.best_total = r.ryanair_rt_total;
+                        r.best_source = 'direct';
+                        r.price_confirmed = true;
+                        r.full_total = r.ryanair_rt_total;
+                        r.full_pp = r.ryanair_rt_pp;
+                    } else if (r.charter) {
                         const charterTotal = r.charter.total;
                         if (!r.full_total || charterTotal < r.full_total) {
                             r.best_total = charterTotal;
@@ -312,14 +320,32 @@
                     } else if (r.full_total) {
                         r.best_total = r.full_total;
                         r.best_source = 'hub';
-                    } else {
-                        r.best_total = r.ryanair_rt_total || 999999;
+                    } else if (r.ryanair_rt_total > 0) {
+                        r.best_total = r.ryanair_rt_total;
                         r.best_source = 'partial';
+                    } else {
+                        r.best_total = 999999;
+                        r.best_source = 'none';
                     }
                 });
 
-                // Sort by best confirmed total price
-                data.results.sort((a, b) => (a.best_total || 999999) - (b.best_total || 999999));
+                // Filter by budget (frontend side — catch anything backend missed)
+                const maxBudget = parseInt(params.max_budget) || null;
+                if (maxBudget) {
+                    data.results = data.results.filter(r =>
+                        r.best_total <= maxBudget || r.best_source === 'none'
+                    );
+                }
+
+                // Sort: confirmed prices first (by price), then unconfirmed (by temp)
+                data.results.sort((a, b) => {
+                    const aHas = a.best_source !== 'none';
+                    const bHas = b.best_source !== 'none';
+                    if (aHas && !bHas) return -1;
+                    if (!aHas && bHas) return 1;
+                    if (aHas && bHas) return a.best_total - b.best_total;
+                    return (b.temp || 0) - (a.temp || 0);
+                });
 
                 // Regenerate recommendations based on final prices
                 showLoadingCircle(div, 100, '✅ Gotowe!');

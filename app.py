@@ -2166,17 +2166,20 @@ SEASON_WARNINGS = {
 
 
 def generate_warm_recommendations(results, month, pax):
-    """Generate top 3 concrete trip proposals based on multi-dimensional scoring."""
-    if not results or len(results) < 2:
+    """Generate top 3 concrete trip proposals based on multi-dimensional scoring.
+    Only includes results that have actual confirmed prices."""
+    # Only consider results with real prices
+    priced_results = [r for r in results if r.get("has_price")]
+    if not priced_results or len(priced_results) < 1:
         return []
 
     MONTH_NAMES_PL = {1: "styczeń", 2: "luty", 3: "marzec", 4: "kwiecień", 5: "maj", 6: "czerwiec",
                       7: "lipiec", 8: "sierpień", 9: "wrzesień", 10: "październik", 11: "listopad", 12: "grudzień"}
     month_name = MONTH_NAMES_PL.get(month, str(month))
 
-    # Score every result
+    # Score every result WITH price
     scored = []
-    for r in results:
+    for r in priced_results:
         traits = DEST_TRAITS.get(r["keyword"], {})
         price = r.get("grand_total", 99999)
         temp = r.get("temp", 25)
