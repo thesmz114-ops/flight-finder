@@ -2367,12 +2367,17 @@ def warm_search(params):
     # Step 3b: Fetch charter flights from Rainbow API (fast HTTP, no scraping)
     charter_flights = []
     try:
-        charter_flights = search_charter_rainbow(date_out_from, date_out_to, adults, children)
-        log.info(f"Warm search: found {len(charter_flights)} charter flights from Rainbow")
+        all_charters = search_charter_rainbow(date_out_from, date_out_to, adults, children)
+        # FILTER: only charters within user's date range
+        for cf in all_charters:
+            cf_date = cf.get("date", "")
+            if cf_date >= date_out_from and cf_date <= date_out_to:
+                charter_flights.append(cf)
+        log.info(f"Warm search: {len(all_charters)} total charters, {len(charter_flights)} in date range {date_out_from}–{date_out_to}")
     except Exception as e:
         log.error(f"Charter search error: {e}")
 
-    # Build charter lookup: dest_iata -> cheapest charter
+    # Build charter lookup: dest_iata -> cheapest charter IN DATE RANGE
     charter_by_dest = {}
     for cf in charter_flights:
         iata = cf["dest_iata"]
