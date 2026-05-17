@@ -129,19 +129,27 @@
             </div>
             <div class="form-group">
                 <label>Wylot od</label>
-                <input type="date" id="date_out_from" value="2026-12-25">
+                <input type="date" id="date_out_from" value="2026-12-25" onchange="recalcReturnDates()">
             </div>
             <div class="form-group">
                 <label>Wylot do</label>
-                <input type="date" id="date_out_to" value="2026-12-27">
+                <input type="date" id="date_out_to" value="2026-12-27" onchange="recalcReturnDates()">
+            </div>
+            <div class="form-group">
+                <label>Min. dni pobytu</label>
+                <input type="number" id="min_days" value="10" min="1" max="60" onchange="recalcReturnDates()">
+            </div>
+            <div class="form-group">
+                <label>Max. dni pobytu</label>
+                <input type="number" id="max_days" value="16" min="1" max="90" onchange="recalcReturnDates()">
             </div>
             <div class="form-group">
                 <label>Powrót od</label>
-                <input type="date" id="date_ret_from" value="2027-01-08">
+                <input type="date" id="date_ret_from" value="2027-01-04" readonly style="opacity:0.7">
             </div>
             <div class="form-group">
                 <label>Powrót do</label>
-                <input type="date" id="date_ret_to" value="2027-01-10">
+                <input type="date" id="date_ret_to" value="2027-01-12" readonly style="opacity:0.7">
             </div>
             <div class="form-group">
                 <label>Max przesiadek (w 1 stronę)</label>
@@ -169,6 +177,27 @@
     </div>
 
     <script>
+        // Auto-calculate return dates from departure + min/max days
+        function recalcReturnDates() {
+            const outFrom = document.getElementById('date_out_from').value;
+            const outTo = document.getElementById('date_out_to').value;
+            const minDays = parseInt(document.getElementById('min_days').value) || 10;
+            const maxDays = parseInt(document.getElementById('max_days').value) || 16;
+
+            if (outFrom) {
+                const d1 = new Date(outFrom);
+                d1.setDate(d1.getDate() + minDays);
+                document.getElementById('date_ret_from').value = d1.toISOString().split('T')[0];
+            }
+            if (outTo) {
+                const d2 = new Date(outTo);
+                d2.setDate(d2.getDate() + maxDays);
+                document.getElementById('date_ret_to').value = d2.toISOString().split('T')[0];
+            }
+        }
+        // Init on load
+        recalcReturnDates();
+
         // Filter suggestion chips
         document.getElementById('destination').addEventListener('input', function() {
             const q = this.value.toLowerCase();
@@ -208,6 +237,8 @@
                 adults: document.getElementById('adults').value,
                 children: document.getElementById('children').value,
                 min_temp: 17,
+                min_days: parseInt(document.getElementById('min_days').value) || 10,
+                max_days: parseInt(document.getElementById('max_days').value) || 16,
                 max_stops: document.getElementById('max_stops').value,
                 max_budget: document.getElementById('max_budget').value,
             };

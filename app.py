@@ -2301,7 +2301,9 @@ def warm_search(params):
     adults = params.get("adults", 2)
     children = params.get("children", 2)
     pax = adults + children
-    min_temp = params.get("min_temp", 24)
+    min_temp = params.get("min_temp", 17)
+    min_days = params.get("min_days", 10)
+    max_days = params.get("max_days", 16)
     max_stops = params.get("max_stops")  # None=any, 0=direct only, 1=max 1 stop
     max_budget = params.get("max_budget")
 
@@ -2420,8 +2422,16 @@ def warm_search(params):
                         continue
                     pl_direct_rt_pp = out_pp + ret_pp
                     pl_direct_rt_total = round(pl_direct_rt_pp * pax, 2)
+                    out_date = cheapest_out.get("date", date_out_from)
+                    ret_date = cheapest_ret.get("date", date_ret_from)
+                    try:
+                        trip_days = (datetime.strptime(ret_date, "%Y-%m-%d") - datetime.strptime(out_date, "%Y-%m-%d")).days
+                    except Exception:
+                        trip_days = 0
+                    if trip_days < min_days or trip_days > max_days:
+                        continue
                     route = {
-                        "hub": dest_ap,  # "hub" is actually destination
+                        "hub": dest_ap,
                         "origin": origin,
                         "out_pp": out_pp,
                         "ret_pp": ret_pp,
@@ -2429,8 +2439,9 @@ def warm_search(params):
                         "ret_airline": cheapest_ret.get("airline", "Ryanair"),
                         "ryanair_rt_pp": round(pl_direct_rt_pp, 2),
                         "ryanair_rt_total": pl_direct_rt_total,
-                        "out_date": cheapest_out.get("date", date_out_from),
-                        "ret_date": cheapest_ret.get("date", date_ret_from),
+                        "out_date": out_date,
+                        "ret_date": ret_date,
+                        "trip_days": trip_days,
                         "is_direct": True,
                     }
                     if best is None or pl_direct_rt_total < best["ryanair_rt_total"]:
@@ -2460,6 +2471,15 @@ def warm_search(params):
                 out_airline = cheapest_out.get("airline", "Ryanair")
                 ret_airline = cheapest_ret.get("airline", "Ryanair")
 
+                out_date = cheapest_out.get("date", date_out_from)
+                ret_date = cheapest_ret.get("date", date_ret_from)
+                try:
+                    trip_days = (datetime.strptime(ret_date, "%Y-%m-%d") - datetime.strptime(out_date, "%Y-%m-%d")).days
+                except Exception:
+                    trip_days = 0
+                if trip_days < min_days or trip_days > max_days:
+                    continue
+
                 route = {
                     "hub": hub,
                     "origin": origin,
@@ -2469,8 +2489,9 @@ def warm_search(params):
                     "ret_airline": ret_airline,
                     "ryanair_rt_pp": round(pl_hub_rt_pp, 2),
                     "ryanair_rt_total": pl_hub_rt_total,
-                    "out_date": cheapest_out.get("date", date_out_from),
-                    "ret_date": cheapest_ret.get("date", date_ret_from),
+                    "out_date": out_date,
+                    "ret_date": ret_date,
+                    "trip_days": trip_days,
                 }
 
                 if best is None or pl_hub_rt_total < best["ryanair_rt_total"]:
@@ -2621,7 +2642,9 @@ def warm_search_endpoint():
         "date_ret_to": data.get("date_ret_to", "2027-01-10"),
         "adults": int(data.get("adults", 2)),
         "children": int(data.get("children", 2)),
-        "min_temp": int(data.get("min_temp", 24)),
+        "min_temp": int(data.get("min_temp", 17)),
+        "min_days": int(data.get("min_days", 10)),
+        "max_days": int(data.get("max_days", 16)),
         "max_stops": int(data.get("max_stops")) if data.get("max_stops") not in (None, "", "any") else None,
         "max_budget": int(data.get("max_budget")) if data.get("max_budget") else None,
     }
